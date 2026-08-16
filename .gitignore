@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+.coverage
+artifacts/*.pt
+artifacts/*.json
+!artifacts/manifest.json
+!artifacts/smoke-checkpoint.pt
+!artifacts/smoke-benchmark.json
+!artifacts/smoke-evaluation.json
+!artifacts/smoke-sample.json
+
+# Internal release checklist, not published
+SIGNOFF.md
