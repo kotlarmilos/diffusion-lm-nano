@@ -1,0 +1,30 @@
+{
+  "status": "measured",
+  "environment": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "python": "3.13.3",
+    "torch": "2.13.0",
+    "device": "mps",
+    "device_name": "Apple Metal Performance Shaders"
+  },
+  "diffusion": {
+    "median_seconds": 0.018383666989393532,
+    "repeats": 5,
+    "batch_size": 1,
+    "generated_tokens_per_sample": 24,
+    "network_forward_passes": 6,
+    "parameter_count": 34528,
+    "decoding": "fixed-length unconditional masked diffusion"
+  },
+  "autoregressive_gpt2_nano": {
+    "status": "pending",
+    "reason": "No gpt2-nano checkpoint was supplied."
+  },
+  "comparison_protocol": {
+    "hardware": "same machine and precision",
+    "tokenizer": "same existing gpt2-nano tokenizer through the local adapter",
+    "workload": "same generated token count and batch size; diffusion is unconditional while gpt2-nano starts from one token",
+    "timing": "synchronize accelerators, warm up, then report median wall time",
+    "quality": "held-out token metrics plus blinded samples; do not compare training loss directly"
+  }
+}

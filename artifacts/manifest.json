@@ -1,0 +1,295 @@
+{
+  "artifacts": [
+    {
+      "bytes": 26624,
+      "kind": "development-corpus",
+      "path": "artifacts/decoding-copy-corpus.jsonl",
+      "provenance": {
+        "command": "python script generated deterministic copy-pair JSONL locally",
+        "pattern": "six tokens sampled from ids 1..8 followed by an exact copy",
+        "records": 512,
+        "seed": 20260726,
+        "sequence_length": 12
+      },
+      "sha256": "73049b122c98448e0311ebf616b0e5701801033426d78fa01116313878aed33d",
+      "status": "measured"
+    },
+    {
+      "bytes": 9116,
+      "kind": "decoding-extension",
+      "path": "artifacts/decoding-extension.json",
+      "provenance": {
+        "checkpoint": "artifacts/decoding-signal-checkpoint.pt",
+        "command": "python -m diffusion_lm_nano.decoding_study",
+        "config": "configs/decoding_signal.toml",
+        "device": "cpu",
+        "initial_timestep": 0.75,
+        "ordering_strategies": [
+          "confidence",
+          "fixed_order"
+        ],
+        "seed": 15,
+        "step_budgets": [
+          1,
+          2,
+          3,
+          4,
+          6,
+          12
+        ]
+      },
+      "sha256": "ba8d3058245b5fc8aaa5c822a00fa4e5ddd6fd94c905577a4fb20f80ec3b9c00",
+      "status": "measured"
+    },
+    {
+      "bytes": 483413,
+      "kind": "model-checkpoint",
+      "path": "artifacts/decoding-signal-checkpoint.pt",
+      "provenance": {
+        "command": "python -m diffusion_lm_nano.train --config configs/decoding_signal.toml --checkpoint artifacts/decoding-signal-checkpoint.pt --sample artifacts/decoding-signal-sample.json --manifest artifacts/manifest.json",
+        "config": {
+          "diffusion": {
+            "sampling_steps": 12,
+            "schedule": "linear",
+            "schedule_power": 2.0,
+            "strategy": "confidence",
+            "temperature": 0.0,
+            "train_min_t": 0.05
+          },
+          "model": {
+            "d_ff": 128,
+            "d_model": 64,
+            "dropout": 0.0,
+            "mask_token_id": 257,
+            "max_length": 12,
+            "n_heads": 4,
+            "n_layers": 2,
+            "pad_token_id": 256,
+            "vocab_size": 258
+          },
+          "train": {
+            "batch_size": 32,
+            "corpus_path": "artifacts/decoding-copy-corpus.jsonl",
+            "device": "cpu",
+            "learning_rate": 0.001,
+            "log_every": 1000,
+            "seed": 29,
+            "steps": 8000,
+            "validation_fraction": 0.1,
+            "weight_decay": 0.0
+          }
+        },
+        "seed": 29
+      },
+      "sha256": "6e712c845ab2b046aa426797d6da57920bbd813da52e119ffcce2506aaf580b2",
+      "status": "measured"
+    },
+    {
+      "bytes": 3259,
+      "kind": "iterative-sample",
+      "path": "artifacts/decoding-signal-sample.json",
+      "provenance": {
+        "command": "python -m diffusion_lm_nano.train --config configs/decoding_signal.toml --checkpoint artifacts/decoding-signal-checkpoint.pt --sample artifacts/decoding-signal-sample.json --manifest artifacts/manifest.json",
+        "config": {
+          "diffusion": {
+            "sampling_steps": 12,
+            "schedule": "linear",
+            "schedule_power": 2.0,
+            "strategy": "confidence",
+            "temperature": 0.0,
+            "train_min_t": 0.05
+          },
+          "model": {
+            "d_ff": 128,
+            "d_model": 64,
+            "dropout": 0.0,
+            "mask_token_id": 257,
+            "max_length": 12,
+            "n_heads": 4,
+            "n_layers": 2,
+            "pad_token_id": 256,
+            "vocab_size": 258
+          },
+          "train": {
+            "batch_size": 32,
+            "corpus_path": "artifacts/decoding-copy-corpus.jsonl",
+            "device": "cpu",
+            "learning_rate": 0.001,
+            "log_every": 1000,
+            "seed": 29,
+            "steps": 8000,
+            "validation_fraction": 0.1,
+            "weight_decay": 0.0
+          }
+        },
+        "seed": 29
+      },
+      "sha256": "41a0a3c780d55d4aa71e28793b3fbc537b5aebec0cbce93c96c5b5f983e1a607",
+      "status": "measured"
+    },
+    {
+      "bytes": null,
+      "kind": "model-checkpoint",
+      "path": "artifacts/publication-checkpoint.pt",
+      "provenance": {
+        "command": "./scripts/train_publication.sh",
+        "config": "configs/publication.toml",
+        "reason": "Publication training has not been run."
+      },
+      "sha256": null,
+      "status": "pending"
+    },
+    {
+      "bytes": null,
+      "kind": "iterative-sample",
+      "path": "artifacts/publication-sample.json",
+      "provenance": {
+        "command": "./scripts/train_publication.sh",
+        "config": "configs/publication.toml",
+        "reason": "Publication training has not been run."
+      },
+      "sha256": null,
+      "status": "pending"
+    },
+    {
+      "bytes": 1078,
+      "kind": "benchmark",
+      "path": "artifacts/smoke-benchmark.json",
+      "provenance": {
+        "autoregressive_baseline": "pending",
+        "checkpoint": "artifacts/smoke-checkpoint.pt",
+        "command": "python -m diffusion_lm_nano.benchmark --checkpoint artifacts/smoke-checkpoint.pt --length 12 --repeats 2 --warmup 1 --output artifacts/smoke-benchmark.json",
+        "seed": 19
+      },
+      "sha256": "873bf60a150bd32f17254202198462daa3c39c80eee669137db6305a4fe346af",
+      "status": "measured"
+    },
+    {
+      "bytes": 151257,
+      "kind": "model-checkpoint",
+      "path": "artifacts/smoke-checkpoint.pt",
+      "provenance": {
+        "command": "python -m diffusion_lm_nano.train --config configs/smoke.toml --checkpoint artifacts/smoke-checkpoint.pt --sample artifacts/smoke-sample.json --manifest artifacts/manifest.json",
+        "config": {
+          "diffusion": {
+            "sampling_steps": 6,
+            "schedule": "linear",
+            "schedule_power": 2.0,
+            "strategy": "confidence",
+            "temperature": 0.0,
+            "train_min_t": 0.05
+          },
+          "model": {
+            "d_ff": 64,
+            "d_model": 32,
+            "dropout": 0.0,
+            "mask_token_id": 257,
+            "max_length": 24,
+            "n_heads": 4,
+            "n_layers": 2,
+            "pad_token_id": 256,
+            "vocab_size": 258
+          },
+          "train": {
+            "batch_size": 2,
+            "corpus_path": null,
+            "device": "cpu",
+            "learning_rate": 0.001,
+            "log_every": 1,
+            "seed": 7,
+            "steps": 4,
+            "validation_fraction": 0.1,
+            "weight_decay": 0.0
+          }
+        },
+        "seed": 7
+      },
+      "sha256": "afd482280c9b7a5b3f1cb6036fd8d705e7c5575fc18a2015c97526b9925cf9f0",
+      "status": "measured"
+    },
+    {
+      "bytes": 232,
+      "kind": "evaluation",
+      "path": "artifacts/smoke-evaluation.json",
+      "provenance": {
+        "checkpoint": "artifacts/smoke-checkpoint.pt",
+        "command": "python -m diffusion_lm_nano.evaluate --checkpoint artifacts/smoke-checkpoint.pt --output artifacts/smoke-evaluation.json",
+        "seed": 11
+      },
+      "sha256": "26f412a2f355ceb791abb423910e981f60d299c17493efbd16a07af155d041b7",
+      "status": "measured"
+    },
+    {
+      "bytes": 2884,
+      "kind": "iterative-sample",
+      "path": "artifacts/smoke-sample.json",
+      "provenance": {
+        "command": "python -m diffusion_lm_nano.train --config configs/smoke.toml --checkpoint artifacts/smoke-checkpoint.pt --sample artifacts/smoke-sample.json --manifest artifacts/manifest.json",
+        "config": {
+          "diffusion": {
+            "sampling_steps": 6,
+            "schedule": "linear",
+            "schedule_power": 2.0,
+            "strategy": "confidence",
+            "temperature": 0.0,
+            "train_min_t": 0.05
+          },
+          "model": {
+            "d_ff": 64,
+            "d_model": 32,
+            "dropout": 0.0,
+            "mask_token_id": 257,
+            "max_length": 24,
+            "n_heads": 4,
+            "n_layers": 2,
+            "pad_token_id": 256,
+            "vocab_size": 258
+          },
+          "train": {
+            "batch_size": 2,
+            "corpus_path": null,
+            "device": "cpu",
+            "learning_rate": 0.001,
+            "log_every": 1,
+            "seed": 7,
+            "steps": 4,
+            "validation_fraction": 0.1,
+            "weight_decay": 0.0
+          }
+        },
+        "seed": 7
+      },
+      "sha256": "b7a9c25247d302ca653f830fe555d323ab0cc291aa6bca8573d24c1f98d7995b",
+      "status": "measured"
+    },
+    {
+      "bytes": 23224,
+      "kind": "runtime-wheel",
+      "path": "space/diffusion_lm_nano-0.1.0rc1-py3-none-any.whl",
+      "provenance": {
+        "command": "python -m build --wheel",
+        "reason": "Standalone Space runtime built from this working tree."
+      },
+      "sha256": "e97d2b045855c34e6f35b00382d7566ebfcae6389ec0581fd8e63965d85ba399",
+      "status": "release-candidate"
+    },
+    {
+      "bytes": 12278,
+      "kind": "runtime-wheel",
+      "path": "vendor/gpt2_nano-0.2.0-py3-none-any.whl",
+      "provenance": {
+        "reason": "Exact local autoregressive implementation used by the comparison benchmark."
+      },
+      "sha256": "978c5b7ec1bc740287963ed93527f04aaa3e7725609ceb271792f83089989489",
+      "status": "release-candidate"
+    }
+  ],
+  "project": "diffusion-lm-nano",
+  "schema_version": 1,
+  "status_definitions": {
+    "measured": "Produced by the stated command and hashed from local bytes.",
+    "pending": "Not produced in this repository state.",
+    "simulated": "Synthetic demonstration output that cannot support an empirical claim."
+  },
+  "updated_at": "2026-07-26T13:51:48.237721+00:00"
+}
