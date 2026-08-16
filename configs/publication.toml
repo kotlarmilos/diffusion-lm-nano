@@ -1,0 +1,29 @@
+[model]
+vocab_size = 9159
+max_length = 256
+d_model = 512
+n_heads = 8
+n_layers = 12
+d_ff = 2048
+dropout = 0.1
+mask_token_id = 9158
+pad_token_id = 9157
+
+[diffusion]
+schedule = "cosine"
+schedule_power = 2.0
+train_min_t = 0.001
+sampling_steps = 64
+strategy = "confidence"
+temperature = 0.8
+
+[train]
+seed = 2026
+steps = 10000
+batch_size = 32
+learning_rate = 0.0003
+weight_decay = 0.01
+log_every = 100
+device = "auto"
+corpus_path = "data/train.bin"
+validation_fraction = 0.1
