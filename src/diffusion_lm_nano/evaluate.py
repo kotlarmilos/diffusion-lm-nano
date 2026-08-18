@@ -76,7 +76,11 @@ def main(argv: list[str] | None = None) -> None:
         batches.append(torch.tensor([ids], device=device))
         evaluation_source = "command-line text"
     else:
-        dataset = BinaryTokenDataset(args.corpus_path, model_config.max_length)
+        dataset = BinaryTokenDataset(
+            args.corpus_path,
+            model_config.max_length,
+            token_limit=model_config.pad_token_id,
+        )
         train_config = checkpoint.get("train_config", {})
         validation_fraction = (
             float(args.validation_fraction)

@@ -684,7 +684,11 @@ def run_study(
         raise ValueError(
             "study training config does not match checkpoint training input"
         )
-    dataset = _load_token_dataset(config.corpus_path, model_config.max_length)
+    dataset = _load_token_dataset(
+        config.corpus_path,
+        model_config.max_length,
+        model_config.pad_token_id,
+    )
     calibration_indices, heldout_indices = split_holdout_windows(
         len(dataset),
         validation_fraction,
@@ -993,11 +997,16 @@ def _adaptive_key(config: AdaptiveDecodeConfig) -> tuple[int, float, float, int]
 def _load_token_dataset(
     corpus_path: Path,
     sequence_length: int,
+    token_limit: int,
 ) -> BinaryTokenDataset | JsonlTokenDataset:
     if corpus_path.suffix == ".jsonl":
         return JsonlTokenDataset(corpus_path, sequence_length)
     if corpus_path.suffix == ".bin":
-        return BinaryTokenDataset(corpus_path, sequence_length)
+        return BinaryTokenDataset(
+            corpus_path,
+            sequence_length,
+            token_limit=token_limit,
+        )
     raise ValueError("study corpus must be a .bin or .jsonl token dataset")
 
 

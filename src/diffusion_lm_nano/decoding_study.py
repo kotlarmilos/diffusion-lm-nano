@@ -399,7 +399,11 @@ def build_reference_batches(
         ids = tokenizer.encode(text)[: model_config.max_length]
         ids += [model_config.pad_token_id] * (model_config.max_length - len(ids))
         return [torch.tensor([ids], dtype=torch.long)], "command-line text"
-    dataset = _load_token_dataset(corpus_path, model_config.max_length)
+    dataset = _load_token_dataset(
+        corpus_path,
+        model_config.max_length,
+        model_config.pad_token_id,
+    )
     validation_start = int(len(dataset) * (1.0 - validation_fraction))
     selected = [
         dataset[index]
@@ -632,10 +636,15 @@ def _load_tokenizer(
 def _load_token_dataset(
     corpus_path: Path,
     sequence_length: int,
+    token_limit: int,
 ) -> BinaryTokenDataset | JsonlTokenDataset:
     if corpus_path.suffix == ".jsonl":
         return JsonlTokenDataset(corpus_path, sequence_length)
-    return BinaryTokenDataset(corpus_path, sequence_length)
+    return BinaryTokenDataset(
+        corpus_path,
+        sequence_length,
+        token_limit=token_limit,
+    )
 
 
 def _device_name(device: torch.device) -> str:

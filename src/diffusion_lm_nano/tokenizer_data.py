@@ -6,6 +6,7 @@ from array import array
 from collections.abc import Sequence
 import json
 from pathlib import Path
+import struct
 import sys
 from typing import Protocol
 
@@ -106,17 +107,39 @@ class GPT2NanoTokenizerAdapter:
 class BinaryTokenDataset(Dataset[Tensor]):
     """Read contiguous little-endian uint16 token blocks used by gpt2-nano."""
 
-    def __init__(self, path: str | Path, sequence_length: int) -> None:
+    def __init__(
+        self,
+        path: str | Path,
+        sequence_length: int,
+        token_limit: int | None = None,
+    ) -> None:
         self.path = Path(path)
         if sequence_length < 1:
             raise ValueError("sequence_length must be positive")
+        if token_limit is not None and token_limit < 1:
+            raise ValueError("token_limit must be positive")
         if not self.path.is_file():
             raise FileNotFoundError(self.path)
+        header_bytes = 256 * 4
+        with self.path.open("rb") as handle:
+            header = handle.read(header_bytes)
+        if len(header) != header_bytes:
+            raise ValueError("token shard has a truncated header")
+        metadata = struct.unpack("<256i", header)
+        if metadata[0] != 20250320 or metadata[1] != 1:
+            raise ValueError("token shard has an unsupported header")
+        token_count = metadata[2]
+        expected_bytes = header_bytes + token_count * 2
+        if token_count < 1 or self.path.stat().st_size != expected_bytes:
+            raise ValueError("token shard size does not match its token count")
         values = array("H")
         with self.path.open("rb") as handle:
-            values.fromfile(handle, self.path.stat().st_size // values.itemsize)
+            handle.seek(header_bytes)
+            values.fromfile(handle, token_count)
         if sys.byteorder != "little":
             values.byteswap()
+        if token_limit is not None and max(values) >= token_limit:
+            raise ValueError("token shard contains an ID outside the base vocabulary")
         self._values = values
         self.sequence_length = sequence_length
         if len(values) < sequence_length:

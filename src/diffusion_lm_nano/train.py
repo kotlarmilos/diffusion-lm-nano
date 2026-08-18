@@ -95,7 +95,11 @@ def _load_corpus(
         return tokenizer.encode(DEFAULT_TEXT * 8)
     corpus_path = Path(path)
     if corpus_path.suffix == ".bin":
-        return BinaryTokenDataset(corpus_path, config.model.max_length)
+        return BinaryTokenDataset(
+            corpus_path,
+            config.model.max_length,
+            token_limit=config.model.pad_token_id,
+        )
     if corpus_path.suffix == ".jsonl":
         return JsonlTokenDataset(corpus_path, config.model.max_length)
     return tokenizer.encode(corpus_path.read_text(encoding="utf-8"))

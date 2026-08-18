@@ -310,14 +310,14 @@
       "status": "measured"
     },
     {
-      "bytes": 41832,
+      "bytes": 42197,
       "kind": "runtime-wheel",
       "path": "space/diffusion_lm_nano-0.1.0rc1-py3-none-any.whl",
       "provenance": {
         "command": "python -m build --wheel",
         "reason": "Standalone Space runtime built from this working tree."
       },
-      "sha256": "53de2f16a21c7c9b0778ff3d143c229fd3b5b73cdea8fd2340ae7974b7f7caed",
+      "sha256": "12deedb976e5f3f019072ddddcb486348972b7673b1605ba96b89eb3c57ad6c0",
       "status": "release-candidate"
     },
     {
