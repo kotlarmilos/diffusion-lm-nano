@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import asdict
+import hashlib
 import json
 import os
 from pathlib import Path
 import random
+import subprocess
 
 import torch
 from torch import Tensor
@@ -30,6 +32,27 @@ DEFAULT_TEXT = (
     "Language diffusion learns to restore masked tokens using both left and right "
     "context. A small model makes each assumption visible. "
 )
+
+
+def _git_state() -> dict[str, object]:
+    revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    status = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return {
+        "git_revision": revision,
+        "git_dirty": bool(status),
+        "git_status_sha256": hashlib.sha256(status.encode()).hexdigest(),
+        "git_state_captured": "training_start",
+    }
 
 
 def select_device(requested: str) -> torch.device:
@@ -86,6 +109,7 @@ def train(
     manifest_path: Path,
     tokenizer_path: Path | None = None,
 ) -> dict[str, float]:
+    source_state = _git_state()
     torch.manual_seed(config.train.seed)
     torch.use_deterministic_algorithms(True)
     if torch.cuda.is_available():
@@ -206,6 +230,7 @@ def train(
                 sha256(tokenizer_path) if tokenizer_path is not None else None
             ),
         },
+        "source": source_state,
         "tokenizer": {
             "kind": type(tokenizer).__name__,
             "path": str(tokenizer_path) if tokenizer_path is not None else None,
@@ -282,6 +307,7 @@ def train(
         ),
         "config": asdict(config),
         "seed": config.train.seed,
+        "source": source_state,
     }
     record_artifact(
         manifest_path,

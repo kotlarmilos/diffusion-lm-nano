@@ -3,6 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 
+import torch
+
 from diffusion_lm_nano.config import (
     DiffusionConfig,
     ModelConfig,
@@ -89,15 +91,26 @@ class GPT2NanoTokenizerTests(unittest.TestCase):
             config_path = root / "config.toml"
             config_path.write_text("# test configuration\n", encoding="utf-8")
 
+            checkpoint_path = root / "artifacts" / "checkpoint.pt"
             result = train(
                 config,
                 config_path,
-                root / "artifacts" / "checkpoint.pt",
+                checkpoint_path,
                 root / "artifacts" / "sample.json",
                 manifest,
             )
 
             self.assertGreater(result["final_train_loss"], 0)
+            checkpoint = torch.load(
+                checkpoint_path,
+                map_location="cpu",
+                weights_only=True,
+            )
+            self.assertIsInstance(checkpoint["source"]["git_revision"], str)
+            self.assertEqual(
+                checkpoint["source"]["git_state_captured"],
+                "training_start",
+            )
 
 
 if __name__ == "__main__":

@@ -638,6 +638,15 @@ def run_study(
         map_location=device,
         weights_only=True,
     )
+    source = checkpoint.get("source")
+    if (
+        not isinstance(source, dict)
+        or source.get("git_dirty") is not False
+        or source.get("git_state_captured") != "training_start"
+        or not isinstance(source.get("git_revision"), str)
+        or not source["git_revision"]
+    ):
+        raise ValueError("checkpoint does not record clean training source provenance")
     model_config = ModelConfig(**checkpoint["model_config"])
     diffusion_config = DiffusionConfig(**checkpoint["diffusion_config"])
     model_config.validate()
@@ -749,6 +758,7 @@ def run_study(
             "device_name": _device_name(device),
             "precision": config.precision,
         },
+        "source": source,
         "inputs": {
             "checkpoint": str(config.checkpoint_path),
             "training_config": str(config.training_config_path),
