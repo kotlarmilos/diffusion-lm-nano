@@ -340,6 +340,23 @@ if temperature > 0:
   confidence_i = softmax(logits_{k,i} / temperature)_{proposal_i}
 ```
 
+The same proposal distribution provides normalized entropy over the non-special
+token support `V - 2`.
+
+```
+entropy_i
+  = -sum_v p_i(v) log p_i(v) / log(V - 2)
+
+mean_entropy_k
+  = mean_{i in R_k} entropy_i
+
+mean_confidence_k
+  = mean_{i in R_k} confidence_i
+
+confidence_improvement_k
+  = mean_confidence_k - mean_confidence_{k-1}
+```
+
 Only currently masked positions can be revealed. Let `R_k` be that set. The
 configured schedule gives a target remaining mask fraction, and a termination
 rule guarantees progress.
@@ -363,6 +380,24 @@ from left to right. The fixed-fraction strategy chooses that many masked
 positions uniformly at random. Revealed positions receive the proposed token,
 and the rest stay masked.
 
+The adaptive strategy normally uses the confidence ordering and the same quota.
+After a configured minimum pass count, it instead commits every unresolved
+proposal and stops when either condition holds.
+
+```
+mean_entropy_k < entropy_threshold
+
+or
+
+confidence_improvement_k < confidence_delta
+for confidence_patience consecutive eligible passes
+```
+
+Entropy threshold zero and confidence patience zero disable their respective
+conditions. Early finalization is monotone because it only replaces current
+masks. If neither condition fires, the termination quota still reveals every
+remaining mask on the declared final pass.
+
 ```
 y_{k+1,i}
   = proposal_i if i is revealed at step k
@@ -375,27 +410,16 @@ checks that no mask tokens remain.
 
 ### Where it lives in the code
 
-`src/diffusion_lm_nano/sampler.py` implements the reverse process in `sample`.
-Lines 35 to 40 validate the requested dimensions, strategy, and temperature.
-Lines 42 to 44 initialize the sample with `mask_token_id` at every position.
-Lines 45 to 51 loop over denoising steps, identify current masks, compute
-`time_value = 1.0 - step / steps`, and call `model(tokens, t)`. Lines 52 to 56
-validate the logit shape and set the mask and pad logits to `-torch.inf`.
-
-`_draw_predictions` turns logits into proposals on lines 96 to 110. Lines 101
-to 103 implement greedy decoding when `temperature == 0`. Lines 104 to 110
-implement temperature-scaled multinomial sampling and record the probability
-of the sampled token as confidence.
-
-The reveal rule lives in `sample` lines 58 to 89. Lines 58 to 60 compute the
-target mask fraction from the configured schedule or use the current time as a
-fallback. Lines 62 to 74 compute the reveal count from the schedule count and
-the termination count. Lines 78 to 80 choose the most confident masked
-positions for `strategy = "confidence"`. Lines 81 to 82 choose the first masked
-positions for `strategy = "fixed_order"`. Lines 83 to 87 choose random masked
-positions for `strategy = "fixed_fraction"`. Line 89 commits proposals at
-revealed positions and keeps all other tokens unchanged. Lines 90 to 91 emit
-trajectory callbacks. Lines 93 to 94 raise an error if any mask remains.
+`src/diffusion_lm_nano/sampler.py` implements the reverse process. `sample` and
+`sample_from_tokens` retain the tensor-returning interface.
+`sample_with_metadata` and `sample_from_tokens_with_metadata` additionally
+return actual forward passes, the stopping reason, and a typed per-pass
+trajectory. `_draw_predictions` preserves greedy temperature-zero behavior and
+positive-temperature multinomial generator semantics. `normalized_entropy`
+computes the audit statistic from the already computed proposal probabilities.
+The reveal loop evaluates adaptive conditions before the ordinary quota, commits
+all current unresolved predictions on a trigger, and otherwise applies the
+configured fixed or confidence-ranked reveal rule.
 
 `src/diffusion_lm_nano/train.py` uses the same sampler after training. Lines
 218 to 232 call `sample` with the trained model, the configured number of
@@ -494,6 +518,27 @@ masked tokens at budgets `1`, `2`, `3`, `4`, `6`, and `12`. Fixed order reaches
 Pareto frontier improves through three reveal steps and then stops improving.
 Confidence ordering ties fixed order when one step reveals every selected mask
 and beats fixed order at every larger budget in this development-scale run.
+
+### Pending adaptive publication protocol
+
+The adaptive question is whether confidence and entropy can identify examples
+whose unresolved predictions are ready to finalize before a declared
+maximum-pass budget without selecting thresholds on the final evaluation
+window. `src/diffusion_lm_nano/adaptive_study.py` prepares each corruption once,
+reuses it across all policies, and assigns the same decoding seed to each paired
+policy run.
+
+`configs/adaptive_study_publication.toml` preregisters a feasible grid for one
+RTX A6000. The first disjoint window inside the training tail holdout calibrates
+the adaptive configuration. Selection maximizes initially masked token
+reconstruction accuracy, then exact sequence recovery, then minimizes realized
+forward passes. A later non-overlapping window evaluates fixed-order,
+fixed-fraction, confidence, and the selected adaptive policy. The artifact
+stores paired per-example metrics and trajectories, actual forward calls,
+stopping reasons, synchronized wall time, input hashes, precision, and hardware.
+The wall-time field includes Python overhead and cannot support a speed claim by
+itself. All real-corpus GPU result fields remain pending until that command
+produces and hashes the publication artifact.
 
 ## Honesty boundary: what is measured and what remains pending
 

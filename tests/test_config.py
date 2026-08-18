@@ -4,7 +4,12 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
 
-from diffusion_lm_nano.config import DiffusionConfig, ModelConfig, ProjectConfig
+from diffusion_lm_nano.config import (
+    AdaptiveDecodeConfig,
+    DiffusionConfig,
+    ModelConfig,
+    ProjectConfig,
+)
 
 
 class ConfigTests(unittest.TestCase):
@@ -34,6 +39,29 @@ class ConfigTests(unittest.TestCase):
     def test_invalid_strategy_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "strategy"):
             DiffusionConfig(strategy="unknown").validate()  # type: ignore[arg-type]
+
+    def test_adaptive_config_is_strictly_validated(self) -> None:
+        with self.assertRaisesRegex(ValueError, "entropy_threshold"):
+            AdaptiveDecodeConfig(entropy_threshold=1.1).validate()
+        with self.assertRaisesRegex(ValueError, "cannot exceed"):
+            DiffusionConfig(
+                strategy="adaptive",
+                sampling_steps=3,
+                adaptive_min_passes=4,
+            ).validate()
+        with self.assertRaisesRegex(ValueError, "cannot trigger"):
+            DiffusionConfig(
+                strategy="adaptive",
+                sampling_steps=3,
+                adaptive_confidence_patience=3,
+            ).validate()
+
+    def test_adaptive_defaults_do_not_change_existing_strategy(self) -> None:
+        config = DiffusionConfig()
+        config.validate()
+        self.assertEqual(config.strategy, "confidence")
+        self.assertEqual(config.adaptive_entropy_threshold, 0.0)
+        self.assertEqual(config.adaptive_confidence_patience, 0)
 
     def test_special_tokens_must_differ(self) -> None:
         with self.assertRaisesRegex(ValueError, "differ"):

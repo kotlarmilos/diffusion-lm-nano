@@ -25,6 +25,9 @@ fi
   --output artifacts/publication-evaluation.json \
   --manifest artifacts/manifest.json
 
+PYTHON="$PYTHON" ./scripts/run_adaptive_study.sh \
+  configs/adaptive_study_publication.toml
+
 "$PYTHON" -m diffusion_lm_nano.benchmark \
   --checkpoint artifacts/publication-checkpoint.pt \
   --autoregressive-checkpoint checkpoints/gpt2-nano.pt \

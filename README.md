@@ -1,6 +1,6 @@
 # Building a diffusion language model from scratch
 
-This repository is the runnable companion to `article.md`. It implements a small masked discrete diffusion language model in the D3PM and MDLM family. The denoiser is a bidirectional Transformer conditioned on continuous diffusion time. Training masks tokens under a configurable schedule and computes cross entropy only at corrupted positions. Generation starts from masks and reveals several positions per network pass.
+This repository is the runnable companion to `article.md`. It implements a small masked discrete diffusion language model in the D3PM and MDLM family. The denoiser is a bidirectional Transformer conditioned on continuous diffusion time. Training masks tokens under a configurable schedule and computes cross entropy only at corrupted positions. Generation starts from masks and reveals several positions per network pass, with optional confidence-calibrated early finalization.
 
 The repository is a release candidate. No external tokenizer, dataset, or checkpoint is bundled, and no comparative benchmark is claimed. A measured smoke checkpoint can be generated locally to verify the pipeline.
 
@@ -35,7 +35,26 @@ python -m diffusion_lm_nano.benchmark \
 
 ## Core layout
 
-`src/diffusion_lm_nano/schedules.py` defines linear, cosine, and power mask schedules. `corruption.py` applies absorbing mask corruption. `model.py` contains the noncausal Transformer and timestep embedding. `objective.py` excludes clean tokens from loss. `sampler.py` implements fixed-fraction random reveal and confidence-ranked reveal. The three CLI modules train, evaluate, and benchmark.
+`src/diffusion_lm_nano/schedules.py` defines linear, cosine, and power mask schedules. `corruption.py` applies absorbing mask corruption. `model.py` contains the noncausal Transformer and timestep embedding. `objective.py` excludes clean tokens from loss. `sampler.py` implements fixed-fraction, fixed-order, confidence-ranked, and adaptive confidence-ranked reveal. `adaptive_study.py` implements the calibrated matched study.
+
+## Adaptive reveal scheduling
+
+The `adaptive` strategy uses the same confidence-ranked quota as `confidence` unless an early-finalization rule fires. After `adaptive_min_passes`, it commits all current predictions when mean normalized entropy over unresolved positions is below `adaptive_entropy_threshold`, or when mean unresolved confidence improves by less than `adaptive_confidence_delta` for `adaptive_confidence_patience` consecutive checks. Threshold zero and patience zero disable the corresponding rule. The sampler returns actual forward passes, a stopping reason, and per-pass confidence, entropy, improvement, reveal, and remaining-mask fields through `sample_with_metadata` and `sample_from_tokens_with_metadata`.
+
+Run the focused synthetic smoke protocol. The wrapper first regenerates the
+ignored development checkpoint so the command works from a clean checkout:
+
+```sh
+./scripts/run_adaptive_smoke.sh
+```
+
+The pending publication protocol uses disjoint calibration and held-out windows from the same contiguous corpus tail. It preregisters an adaptive grid, selects only on calibration masked-token reconstruction accuracy and exact recovery with realized passes as a later tie-breaker, then evaluates fixed-order, fixed-fraction, confidence, and the selected adaptive policy on identical corruptions and decoding seeds.
+
+```sh
+./scripts/run_adaptive_study.sh configs/adaptive_study_publication.toml
+```
+
+The artifact reports accuracy only on initially masked tokens, exact sequence recovery, realized forward passes, stopping reasons, synchronized wall time, and paired per-example trajectories. Wall time includes Python sampler overhead and does not by itself support a speed claim. Publication GPU results remain pending.
 
 ## Existing gpt2-nano data
 
@@ -82,7 +101,7 @@ Review the external data path and hardware settings first, then run the script.
 ```
 
 To run the full publication workflow on Colab with verified input preparation,
-training, evaluation, and benchmarking in one command:
+training, evaluation, adaptive decoding study, and benchmarking in one command:
 
 ```sh
 ./scripts/colab_publication.sh

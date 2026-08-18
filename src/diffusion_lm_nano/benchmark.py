@@ -15,7 +15,7 @@ import torch
 from .artifacts import record_artifact
 from .config import DiffusionConfig, ModelConfig
 from .model import MaskedDiffusionTransformer
-from .sampler import sample
+from .sampler import sample_with_metadata
 from .schedules import make_schedule
 from .train import select_device
 
@@ -79,20 +79,16 @@ def main(argv: list[str] | None = None) -> None:
     model.eval()
     diffusion_parameters = sum(parameter.numel() for parameter in model.parameters())
     measured_calls: list[int] = []
+    measured_stopping_reasons: list[str] = []
 
-    def run(seed: int) -> int:
-        calls = 0
+    def run(seed: int) -> tuple[int, str]:
         if device.type == "mps":
             torch.manual_seed(seed)
             generator = None
         else:
             generator = torch.Generator(device=device).manual_seed(seed)
 
-        def capture(*_: object) -> None:
-            nonlocal calls
-            calls += 1
-
-        sample(
+        sampling_result = sample_with_metadata(
             model,
             batch_size=args.batch_size,
             length=length,
@@ -105,9 +101,10 @@ def main(argv: list[str] | None = None) -> None:
             schedule=make_schedule(diffusion.schedule, diffusion.schedule_power),
             device=device,
             generator=generator,
-            callback=capture,
+            adaptive_config=diffusion.adaptive_decode_config(),
+            collect_diagnostics=diffusion.strategy == "adaptive",
         )
-        return calls
+        return sampling_result.forward_passes, sampling_result.stopping_reason
 
     for index in range(args.warmup):
         run(args.seed + index)
@@ -115,8 +112,10 @@ def main(argv: list[str] | None = None) -> None:
     for index in range(args.repeats):
         synchronize(device)
         start = time.perf_counter()
-        measured_calls.append(run(args.seed + args.warmup + index))
+        calls, stopping_reason = run(args.seed + args.warmup + index)
         synchronize(device)
+        measured_calls.append(calls)
+        measured_stopping_reasons.append(stopping_reason)
         elapsed.append(time.perf_counter() - start)
     autoregressive_result: dict[str, object]
     if args.autoregressive_checkpoint is None:
@@ -200,7 +199,8 @@ def main(argv: list[str] | None = None) -> None:
             "repeats": args.repeats,
             "batch_size": args.batch_size,
             "generated_tokens_per_sample": length,
-            "network_forward_passes": int(statistics.median(measured_calls)),
+            "network_forward_passes": statistics.median(measured_calls),
+            "stopping_reasons": measured_stopping_reasons,
             "parameter_count": diffusion_parameters,
             "decoding": "fixed-length unconditional masked diffusion",
         },

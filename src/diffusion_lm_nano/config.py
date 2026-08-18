@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from pathlib import Path
 import tomllib
 from typing import Any, Literal
 
 ScheduleKind = Literal["linear", "cosine", "power"]
-DecodeStrategy = Literal["fixed_fraction", "confidence", "fixed_order"]
+DecodeStrategy = Literal["fixed_fraction", "confidence", "fixed_order", "adaptive"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +46,58 @@ class ModelConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class AdaptiveDecodeConfig:
+    min_passes: int = 1
+    entropy_threshold: float = 0.0
+    confidence_delta: float = 0.0
+    confidence_patience: int = 0
+
+    def validate(self, max_passes: int | None = None) -> None:
+        if isinstance(self.min_passes, bool) or not isinstance(self.min_passes, int):
+            raise ValueError("adaptive min_passes must be an integer")
+        if self.min_passes < 1:
+            raise ValueError("adaptive min_passes must be positive")
+        if isinstance(self.entropy_threshold, bool) or not isinstance(
+            self.entropy_threshold, (int, float)
+        ):
+            raise ValueError("adaptive entropy_threshold must be numeric")
+        if not math.isfinite(self.entropy_threshold):
+            raise ValueError("adaptive entropy_threshold must be finite")
+        if not 0.0 <= self.entropy_threshold <= 1.0:
+            raise ValueError("adaptive entropy_threshold must be in [0, 1]")
+        if isinstance(self.confidence_delta, bool) or not isinstance(
+            self.confidence_delta, (int, float)
+        ):
+            raise ValueError("adaptive confidence_delta must be numeric")
+        if not math.isfinite(self.confidence_delta):
+            raise ValueError("adaptive confidence_delta must be finite")
+        if not 0.0 <= self.confidence_delta <= 1.0:
+            raise ValueError("adaptive confidence_delta must be in [0, 1]")
+        if isinstance(self.confidence_patience, bool) or not isinstance(
+            self.confidence_patience, int
+        ):
+            raise ValueError("adaptive confidence_patience must be an integer")
+        if self.confidence_patience < 0:
+            raise ValueError("adaptive confidence_patience must be non-negative")
+        if max_passes is None:
+            return
+        if self.min_passes > max_passes:
+            raise ValueError("adaptive min_passes cannot exceed sampling_steps")
+        if self.entropy_threshold > 0 and self.min_passes >= max_passes:
+            raise ValueError(
+                "adaptive entropy_threshold cannot trigger before sampling_steps"
+            )
+        available_improvements = max_passes - max(2, self.min_passes)
+        if (
+            self.confidence_patience
+            and self.confidence_patience > available_improvements
+        ):
+            raise ValueError(
+                "adaptive confidence_patience cannot trigger within sampling_steps"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class DiffusionConfig:
     schedule: ScheduleKind = "cosine"
     schedule_power: float = 2.0
@@ -52,6 +105,18 @@ class DiffusionConfig:
     sampling_steps: int = 16
     strategy: DecodeStrategy = "confidence"
     temperature: float = 1.0
+    adaptive_min_passes: int = 1
+    adaptive_entropy_threshold: float = 0.0
+    adaptive_confidence_delta: float = 0.0
+    adaptive_confidence_patience: int = 0
+
+    def adaptive_decode_config(self) -> AdaptiveDecodeConfig:
+        return AdaptiveDecodeConfig(
+            min_passes=self.adaptive_min_passes,
+            entropy_threshold=self.adaptive_entropy_threshold,
+            confidence_delta=self.adaptive_confidence_delta,
+            confidence_patience=self.adaptive_confidence_patience,
+        )
 
     def validate(self) -> None:
         if self.schedule not in {"linear", "cosine", "power"}:
@@ -62,10 +127,16 @@ class DiffusionConfig:
             raise ValueError("diffusion.train_min_t must be in [0, 1)")
         if self.sampling_steps < 1:
             raise ValueError("diffusion.sampling_steps must be positive")
-        if self.strategy not in {"fixed_fraction", "confidence", "fixed_order"}:
+        if self.strategy not in {
+            "fixed_fraction",
+            "confidence",
+            "fixed_order",
+            "adaptive",
+        }:
             raise ValueError(f"unknown diffusion.strategy {self.strategy!r}")
         if self.temperature < 0:
             raise ValueError("diffusion.temperature must be non-negative")
+        self.adaptive_decode_config().validate(self.sampling_steps)
 
 
 @dataclass(frozen=True, slots=True)

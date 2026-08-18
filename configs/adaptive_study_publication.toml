@@ -1,0 +1,20 @@
+[study]
+checkpoint_path = "artifacts/publication-checkpoint.pt"
+training_config_path = "configs/publication.toml"
+corpus_path = "data/train.bin"
+output_path = "artifacts/adaptive-decoding-publication.json"
+manifest_path = "artifacts/manifest.json"
+device = "cuda"
+precision = "float32"
+seed = 20260818
+initial_timestep = 0.75
+max_passes = 32
+validation_fraction = 0.1
+calibration_sequences = 32
+heldout_sequences = 128
+warmup_runs = 1
+policies = ["fixed_order", "fixed_fraction", "confidence", "adaptive"]
+adaptive_min_passes = [4]
+adaptive_entropy_thresholds = [0.0, 0.15, 0.25]
+adaptive_confidence_deltas = [0.0, 0.005]
+adaptive_confidence_patiences = [0, 3]

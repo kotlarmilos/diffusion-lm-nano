@@ -1,6 +1,45 @@
 {
   "artifacts": [
     {
+      "bytes": null,
+      "kind": "adaptive-decoding-study",
+      "path": "artifacts/adaptive-decoding-publication.json",
+      "provenance": {
+        "command": "python -m diffusion_lm_nano.adaptive_study --config configs/adaptive_study_publication.toml",
+        "config": "configs/adaptive_study_publication.toml",
+        "immutable_input_expectations": {
+          "checkpoint": {
+            "path": "artifacts/publication-checkpoint.pt",
+            "sha256": "must equal the measured manifest entry at execution",
+            "status": "measured"
+          },
+          "corpus": {
+            "path": "data/train.bin",
+            "sha256": "f08410ea036cc56b78ffc3f6edbf94f5a1d469aeb7c708bb56e4ce544623a69e"
+          },
+          "study_config": {
+            "path": "configs/adaptive_study_publication.toml",
+            "sha256": "352ba4a151ea77764f14ad8062b66776ea844738e4d37a7d0ec730bcdcf52028"
+          },
+          "training_config": {
+            "path": "configs/publication.toml",
+            "sha256": "9cd8db87701526814ec650500e1e9d929172488bd5ed5d6c7067eb68a64f20ce"
+          }
+        },
+        "protocol": {
+          "calibration_sequences": 32,
+          "device": "cuda",
+          "hardware_target": "one RTX A6000",
+          "heldout_sequences": 128,
+          "max_passes": 32,
+          "precision": "float32",
+          "reason": "Real-corpus GPU calibration and held-out evaluation have not been run."
+        }
+      },
+      "sha256": null,
+      "status": "pending"
+    },
+    {
       "bytes": 26624,
       "kind": "development-corpus",
       "path": "artifacts/decoding-copy-corpus.jsonl",
@@ -42,13 +81,17 @@
       "status": "measured"
     },
     {
-      "bytes": 483413,
+      "bytes": 483925,
       "kind": "model-checkpoint",
       "path": "artifacts/decoding-signal-checkpoint.pt",
       "provenance": {
         "command": "python -m diffusion_lm_nano.train --config configs/decoding_signal.toml --checkpoint artifacts/decoding-signal-checkpoint.pt --sample artifacts/decoding-signal-sample.json --manifest artifacts/manifest.json",
         "config": {
           "diffusion": {
+            "adaptive_confidence_delta": 0.0,
+            "adaptive_confidence_patience": 0,
+            "adaptive_entropy_threshold": 0.0,
+            "adaptive_min_passes": 1,
             "sampling_steps": 12,
             "schedule": "linear",
             "schedule_power": 2.0,
@@ -81,17 +124,21 @@
         },
         "seed": 29
       },
-      "sha256": "6e712c845ab2b046aa426797d6da57920bbd813da52e119ffcce2506aaf580b2",
+      "sha256": "db9bdd3383ef5caf3da28c26f737a98aa2854ae32522db42401bca2a15978e20",
       "status": "measured"
     },
     {
-      "bytes": 3259,
+      "bytes": 7759,
       "kind": "iterative-sample",
       "path": "artifacts/decoding-signal-sample.json",
       "provenance": {
         "command": "python -m diffusion_lm_nano.train --config configs/decoding_signal.toml --checkpoint artifacts/decoding-signal-checkpoint.pt --sample artifacts/decoding-signal-sample.json --manifest artifacts/manifest.json",
         "config": {
           "diffusion": {
+            "adaptive_confidence_delta": 0.0,
+            "adaptive_confidence_patience": 0,
+            "adaptive_entropy_threshold": 0.0,
+            "adaptive_min_passes": 1,
             "sampling_steps": 12,
             "schedule": "linear",
             "schedule_power": 2.0,
@@ -124,7 +171,7 @@
         },
         "seed": 29
       },
-      "sha256": "41a0a3c780d55d4aa71e28793b3fbc537b5aebec0cbce93c96c5b5f983e1a607",
+      "sha256": "19232af8caf2afb459aa90ff3b7605024f7637b9980c02cbe27a13dd51f3f46d",
       "status": "measured"
     },
     {
@@ -161,7 +208,7 @@
         "command": "python -m diffusion_lm_nano.benchmark --checkpoint artifacts/smoke-checkpoint.pt --length 12 --repeats 2 --warmup 1 --output artifacts/smoke-benchmark.json",
         "seed": 19
       },
-      "sha256": "873bf60a150bd32f17254202198462daa3c39c80eee669137db6305a4fe346af",
+      "sha256": "60acb91f0a3b078e4bdf59a44066efef419cde06a14830ceaef7d3c7d06cd556",
       "status": "measured"
     },
     {
@@ -263,14 +310,14 @@
       "status": "measured"
     },
     {
-      "bytes": 23224,
+      "bytes": 41504,
       "kind": "runtime-wheel",
       "path": "space/diffusion_lm_nano-0.1.0rc1-py3-none-any.whl",
       "provenance": {
         "command": "python -m build --wheel",
         "reason": "Standalone Space runtime built from this working tree."
       },
-      "sha256": "e97d2b045855c34e6f35b00382d7566ebfcae6389ec0581fd8e63965d85ba399",
+      "sha256": "55b873b9d4afe2d52c9fca1b1639dd61ff27279950ecefcbbe410ef3137c6261",
       "status": "release-candidate"
     },
     {
@@ -291,5 +338,5 @@
     "pending": "Not produced in this repository state.",
     "simulated": "Synthetic demonstration output that cannot support an empirical claim."
   },
-  "updated_at": "2026-07-26T13:51:48.237721+00:00"
+  "updated_at": "2026-08-18T21:51:32.630374+00:00"
 }

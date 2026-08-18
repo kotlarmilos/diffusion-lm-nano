@@ -63,14 +63,17 @@ the token embedding and produces one clean-token distribution at every position.
 Generation begins with a sequence made entirely of mask tokens. The model predicts
 all positions in parallel. The sampler commits some predictions, keeps the rest
 masked, lowers the time value, and calls the model again. Repeating this loop
-produces a complete sequence. The repository includes three reveal rules.
+produces a complete sequence. The repository includes four reveal rules.
 Fixed-fraction decoding reveals enough randomly selected masked positions to finish
 within the remaining steps. Fixed-order decoding reveals masked positions from left
 to right. Both still use the model predictions at those positions, but position
 selection does not depend on confidence. Confidence-based decoding ranks the
 sampled predictions and commits the most confident positions first. Low-confidence
 positions remain masked and can be reconsidered with more context on the next pass.
-This resembles the practical unmasking rule used by many masked generative systems.
+Adaptive decoding uses the same ranking, then commits all remaining current
+predictions when unresolved normalized entropy is low or unresolved confidence has
+stalled for a configured patience after a minimum pass count. This resembles the
+practical unmasking rule used by many masked generative systems.
 
 ## The math
 
@@ -81,7 +84,7 @@ rather than a numerical error. The masked cross entropy is the unweighted
 specialization of the discrete-diffusion ELBO for an absorbing-state process, which
 is why a plain masked-token loss trains the denoiser correctly.
 
-Both reveal rules guarantee termination. The number revealed at each iteration is
+All reveal rules guarantee termination. The number revealed at each iteration is
 at least the ceiling of the remaining masks divided by the remaining steps. The
 final pass therefore has no masks left. The sampler also prevents the dedicated
 mask and padding ids from being emitted as content. Temperature zero gives greedy
@@ -157,6 +160,19 @@ development-scale knee at three reveal steps rather than a claim that more steps
 always help. Confidence ordering matches fixed order at one step and beats it at
 every larger equal budget in this run. The corpus is synthetic and local, so this
 result demonstrates decoding behavior, not publication-scale language quality.
+
+**Pending adaptive extension question.** The new study asks whether calibrated
+entropy or stalled confidence can finalize unresolved positions before a declared
+maximum-pass budget while preserving held-out reconstruction. Adaptive thresholds
+are selected on a dedicated calibration window and evaluated once on a later
+non-overlapping corpus window alongside fixed-order, fixed-fraction, and confidence
+policies with identical corruptions, seeds, checkpoint, precision, and hardware.
+The selected threshold is pending. Calibration metrics are pending. Initially
+masked token accuracy is pending. Exact sequence recovery is pending. Realized
+forward passes are pending. Stopping-reason counts are pending. Wall time is
+pending and will include Python overhead, so it will not alone support a speed
+claim. Paired per-example results are pending. No real-corpus GPU result is claimed
+in this repository state.
 
 The publication path meets the previous `gpt2-nano` project at the data boundary.
 An adapter loads that project's custom BPE vocabulary and merge table. Two IDs after

@@ -9,11 +9,22 @@ from diffusion_lm_nano.config import (
     ProjectConfig,
     TrainConfig,
 )
+from diffusion_lm_nano.artifacts import sha256
 from diffusion_lm_nano.tokenizer_data import GPT2NanoTokenizerAdapter
 from diffusion_lm_nano.train import train
 
 
 class GPT2NanoTokenizerTests(unittest.TestCase):
+    def test_directory_hash_binds_names_and_contents(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            (path / "vocab.json").write_text('{"x": 0}', encoding="utf-8")
+            (path / "merges.json").write_text("[]", encoding="utf-8")
+            first = sha256(path)
+            self.assertEqual(sha256(path), first)
+            (path / "merges.json").write_text('[["x", "x"]]', encoding="utf-8")
+            self.assertNotEqual(sha256(path), first)
+
     def test_custom_bpe_adapter_round_trips_and_reserves_special_ids(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
@@ -75,10 +86,12 @@ class GPT2NanoTokenizerTests(unittest.TestCase):
                     corpus_path=str(corpus),
                 ),
             )
+            config_path = root / "config.toml"
+            config_path.write_text("# test configuration\n", encoding="utf-8")
 
             result = train(
                 config,
-                root / "config.toml",
+                config_path,
                 root / "artifacts" / "checkpoint.pt",
                 root / "artifacts" / "sample.json",
                 manifest,

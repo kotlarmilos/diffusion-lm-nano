@@ -12,12 +12,12 @@ import random
 import torch
 from torch import Tensor
 
-from .artifacts import record_artifact
+from .artifacts import record_artifact, sha256
 from .config import ProjectConfig
 from .corruption import corrupt_tokens
 from .model import MaskedDiffusionTransformer
 from .objective import masked_cross_entropy
-from .sampler import sample
+from .sampler import sample_with_metadata
 from .schedules import make_schedule
 from .tokenizer_data import (
     BinaryTokenDataset,
@@ -186,6 +186,26 @@ def train(
             "validation_fraction": config.train.validation_fraction,
             "method": "contiguous tail holdout",
         },
+        "training_inputs": {
+            "training_config_path": str(config_path),
+            "training_config_sha256": sha256(config_path),
+            "corpus_path": (
+                str(config.train.corpus_path)
+                if config.train.corpus_path is not None
+                else None
+            ),
+            "corpus_sha256": (
+                sha256(config.train.corpus_path)
+                if config.train.corpus_path is not None
+                else None
+            ),
+            "tokenizer_path": (
+                str(tokenizer_path) if tokenizer_path is not None else None
+            ),
+            "tokenizer_sha256": (
+                sha256(tokenizer_path) if tokenizer_path is not None else None
+            ),
+        },
         "tokenizer": {
             "kind": type(tokenizer).__name__,
             "path": str(tokenizer_path) if tokenizer_path is not None else None,
@@ -215,7 +235,7 @@ def train(
             }
         )
 
-    generated = sample(
+    sample_result = sample_with_metadata(
         model,
         batch_size=1,
         length=config.model.max_length,
@@ -229,7 +249,9 @@ def train(
         device=device,
         generator=sample_generator,
         callback=capture,
+        adaptive_config=config.diffusion.adaptive_decode_config(),
     )
+    generated = sample_result.tokens
     decoded = (
         tokenizer.decode(generated[0].cpu().tolist())
         if config.model.vocab_size == tokenizer.vocab_size
@@ -242,6 +264,11 @@ def train(
         "tokenizer": type(tokenizer).__name__,
         "token_ids": generated[0].cpu().tolist(),
         "text": decoded,
+        "forward_passes": sample_result.forward_passes,
+        "stopping_reason": sample_result.stopping_reason,
+        "sampling_diagnostics": [
+            asdict(step) for step in sample_result.trajectory
+        ],
         "trajectory": trajectory,
     }
     sample_path.write_text(

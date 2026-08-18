@@ -1,0 +1,19 @@
+[study]
+checkpoint_path = "artifacts/decoding-signal-checkpoint.pt"
+training_config_path = "configs/decoding_signal.toml"
+corpus_path = "artifacts/decoding-copy-corpus.jsonl"
+output_path = "artifacts/adaptive-decoding-smoke.json"
+device = "cpu"
+precision = "float32"
+seed = 41
+initial_timestep = 0.75
+max_passes = 6
+validation_fraction = 0.1
+calibration_sequences = 4
+heldout_sequences = 4
+warmup_runs = 0
+policies = ["fixed_order", "fixed_fraction", "confidence", "adaptive"]
+adaptive_min_passes = [2]
+adaptive_entropy_thresholds = [0.0, 0.2]
+adaptive_confidence_deltas = [0.0, 0.01]
+adaptive_confidence_patiences = [0, 2]

@@ -9,6 +9,7 @@ from pathlib import Path
 import gradio as gr
 import torch
 
+from diffusion_lm_nano.artifacts import sha256
 from diffusion_lm_nano.config import DiffusionConfig, ModelConfig
 from diffusion_lm_nano.model import MaskedDiffusionTransformer
 from diffusion_lm_nano.sampler import sample
@@ -46,6 +47,18 @@ def load_model() -> tuple[
                 "Set TOKENIZER_PATH to a directory containing vocab.json and "
                 "merges.json for this checkpoint."
             )
+        training_inputs = checkpoint.get("training_inputs")
+        expected_hash = (
+            training_inputs.get("tokenizer_sha256")
+            if isinstance(training_inputs, dict)
+            else None
+        )
+        if not isinstance(expected_hash, str) or len(expected_hash) != 64:
+            raise RuntimeError(
+                "Checkpoint does not record an immutable tokenizer hash."
+            )
+        if sha256(TOKENIZER_PATH) != expected_hash:
+            raise RuntimeError("Tokenizer files do not match the checkpoint.")
         tokenizer = GPT2NanoTokenizerAdapter(TOKENIZER_PATH)
     else:
         raise RuntimeError(f"Unsupported checkpoint tokenizer: {tokenizer_kind!r}")
@@ -84,6 +97,13 @@ def generate(length: int, steps: int, strategy: str, seed: int) -> str:
     steps = int(steps)
     if not 1 <= length <= model_config.max_length:
         raise gr.Error(f"Length must be between 1 and {model_config.max_length}.")
+    if (
+        strategy == "adaptive"
+        and steps < diffusion_config.adaptive_min_passes
+    ):
+        raise gr.Error(
+            "Adaptive steps must be at least the checkpoint adaptive minimum."
+        )
     frames = [
         "<li><strong>Start</strong><pre>"
         + render_tokens(
@@ -121,6 +141,7 @@ def generate(length: int, steps: int, strategy: str, seed: int) -> str:
         ),
         generator=torch.Generator().manual_seed(int(seed)),
         callback=capture,
+        adaptive_config=diffusion_config.adaptive_decode_config(),
     )
     return "<ol class='trajectory'>" + "".join(frames) + "</ol>"
 
@@ -137,7 +158,9 @@ with gr.Blocks(css=".mask{color:#999}.special{color:#a33}pre{white-space:pre-wra
         steps = gr.Slider(1, 128, value=6, step=1, label="Denoising steps")
     with gr.Row():
         strategy = gr.Radio(
-            ["fixed_fraction", "confidence"], value="confidence", label="Reveal strategy"
+            ["fixed_fraction", "fixed_order", "confidence"],
+            value="confidence",
+            label="Reveal strategy",
         )
         seed = gr.Number(value=7, precision=0, label="Seed")
     button = gr.Button("Generate")

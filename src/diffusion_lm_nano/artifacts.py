@@ -10,10 +10,30 @@ from typing import Any
 
 
 def sha256(path: str | Path) -> str:
+    target = Path(path)
     digest = hashlib.sha256()
-    with Path(path).open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
+    if target.is_file():
+        with target.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return digest.hexdigest()
+    if not target.is_dir():
+        raise FileNotFoundError(target)
+    for entry in sorted(
+        target.rglob("*"),
+        key=lambda item: item.relative_to(target).as_posix(),
+    ):
+        if entry.is_symlink():
+            raise ValueError(f"cannot hash symlink in directory: {entry}")
+        if not entry.is_file():
+            continue
+        relative = entry.relative_to(target).as_posix().encode("utf-8")
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update(entry.stat().st_size.to_bytes(8, "big"))
+        with entry.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                digest.update(chunk)
     return digest.hexdigest()
 
 
@@ -51,4 +71,3 @@ def record_artifact(
     manifest_file.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-
