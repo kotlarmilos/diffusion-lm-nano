@@ -7,25 +7,27 @@ from pathlib import Path
 import urllib.request
 
 
+GPT2_NANO_REVISION = "ee547b4112bce2d2557dd0975038035bab6c86eb"
+
 FILES = {
     "checkpoints/gpt2-nano.pt": (
-        "https://huggingface.co/kotlarmilos/gpt2-nano/resolve/main/"
-        "checkpoints/final.pt",
+        f"https://huggingface.co/kotlarmilos/gpt2-nano/resolve/"
+        f"{GPT2_NANO_REVISION}/checkpoints/final.pt",
         "9a293ff319e7e11e7c5c553a5e4957a996493311d04b097933c1e2fcb49bf86e",
     ),
     "data/train.bin": (
-        "https://huggingface.co/kotlarmilos/gpt2-nano/resolve/main/"
-        "bpe-shards/train_000000.bin",
+        f"https://huggingface.co/kotlarmilos/gpt2-nano/resolve/"
+        f"{GPT2_NANO_REVISION}/bpe-shards/train_000000.bin",
         "f08410ea036cc56b78ffc3f6edbf94f5a1d469aeb7c708bb56e4ce544623a69e",
     ),
     "data/bpe-tokenizer/vocab.json": (
-        "https://huggingface.co/kotlarmilos/gpt2-nano/resolve/main/"
-        "bpe-tokenizer/vocab.json",
+        f"https://huggingface.co/kotlarmilos/gpt2-nano/resolve/"
+        f"{GPT2_NANO_REVISION}/bpe-tokenizer/vocab.json",
         "459dba6d2c6ae095718de3db92119bf5cefe19eb9dc0a88781687a5f74f7a4a3",
     ),
     "data/bpe-tokenizer/merges.json": (
-        "https://huggingface.co/kotlarmilos/gpt2-nano/resolve/main/"
-        "bpe-tokenizer/merges.json",
+        f"https://huggingface.co/kotlarmilos/gpt2-nano/resolve/"
+        f"{GPT2_NANO_REVISION}/bpe-tokenizer/merges.json",
         "fcdc81f4b7edc355b2b14132a2a5b8f18912d0839b5eef8786ba5b1884d6814e",
     ),
 }
