@@ -2,7 +2,11 @@
 
 This repository is the runnable companion to `article.md`. It implements a small masked discrete diffusion language model in the D3PM and MDLM family. The denoiser is a bidirectional Transformer conditioned on continuous diffusion time. Training masks tokens under a configurable schedule and computes cross entropy only at corrupted positions. Generation starts from masks and reveals several positions per network pass, with optional confidence-calibrated early finalization.
 
-The repository is a release candidate. No external tokenizer, dataset, or checkpoint is bundled, and no comparative benchmark is claimed. A measured smoke checkpoint can be generated locally to verify the pipeline.
+The repository is a measured release candidate. A clean 10,000-step RTX A6000
+run completed, but the publication checkpoint collapsed onto the end-of-word
+token. The adaptive stopping study selected no early-stop rule. A matched-host
+timing benchmark is included as a narrow systems result, not as evidence of
+language quality or overall model superiority.
 
 ## Run the deterministic smoke path
 
@@ -48,13 +52,16 @@ ignored development checkpoint so the command works from a clean checkout:
 ./scripts/run_adaptive_smoke.sh
 ```
 
-The pending publication protocol uses disjoint calibration and held-out windows from the same contiguous corpus tail. It preregisters an adaptive grid, selects only on calibration masked-token reconstruction accuracy and exact recovery with realized passes as a later tie-breaker, then evaluates fixed-order, fixed-fraction, confidence, and the selected adaptive policy on identical corruptions and decoding seeds.
+The publication protocol uses disjoint calibration and held-out windows from the same contiguous corpus tail. It preregisters an adaptive grid, selects only on calibration masked-token reconstruction accuracy and exact recovery with realized passes as a later tie-breaker, then evaluates fixed-order, fixed-fraction, confidence, and the selected adaptive policy on identical corruptions and decoding seeds.
 
 ```sh
 ./scripts/run_adaptive_study.sh configs/adaptive_study_publication.toml
 ```
 
-The artifact reports accuracy only on initially masked tokens, exact sequence recovery, realized forward passes, stopping reasons, synchronized wall time, and paired per-example trajectories. Wall time includes Python sampler overhead and does not by itself support a speed claim. Publication GPU results remain pending.
+Calibration selected zero entropy and confidence thresholds, which disable early
+stopping. Confidence and adaptive decoding both reached `0.36157` held-out
+masked-token accuracy, recovered zero complete sequences, and used all 32 passes
+on every example. Adaptive added Python overhead without reducing work.
 
 ## Existing gpt2-nano data
 
@@ -62,8 +69,10 @@ The adapter consumes references to existing local artifacts. It never copies the
 
 `GPT2NanoTokenizerAdapter` loads the base project's custom `vocab.json` and
 `merges.json`, then reserves two IDs after its 9,157-token vocabulary for
-padding and masking. `BinaryTokenDataset` reads contiguous little-endian
-`uint16` token IDs from the common `train.bin` layout. `JsonlTokenDataset`
+padding and masking. `BinaryTokenDataset` validates the common shard header,
+which contains 256 little-endian signed 32-bit integers. The header records
+magic `20250320`, version `1`, and the payload token count. The payload then
+stores exactly that many little-endian `uint16` token IDs. `JsonlTokenDataset`
 accepts records with an `input_ids` integer list.
 
 `configs/publication.toml` uses padding ID 9,157, mask ID 9,158, and model
@@ -71,11 +80,46 @@ vocabulary size 9,159. `scripts/prepare_publication_inputs.py` downloads the
 base tokenizer and token shard from their recorded Hugging Face locations and
 verifies their SHA-256 digests before training.
 
-No private gpt2-nano artifact is required for the smoke path.
+No private `gpt2-nano` artifact is required for the smoke path.
+
+## Publication results
+
+The clean checkpoint is bound to source commit `2bb34f0`, has SHA-256
+`96f78f1d51fab2a365142bf2a861feb109633a189658fd97864087e913c3a9db`,
+and records `git_dirty: false` at training start.
+
+| Measurement | Result |
+| --- | ---: |
+| Held-out sequences | 256 |
+| Randomly masked tokens | 19,390 |
+| Masked-token accuracy | 0.36029 |
+| Masked cross entropy | 5.14059 |
+| Majority `<\|EOW\|>` fraction over the same sequences | 0.36205 |
+| Unique token IDs in the 256-token unconditional sample | 1 |
+
+All generated positions are token `9156`, the `<|EOW|>` token that decodes as a
+space. The checkpoint is therefore a documented collapse result rather than a
+usable language model. Reproduce the majority-token control after downloading
+the verified inputs.
+
+```sh
+PYTHONPATH=src python scripts/analyze_publication_baseline.py
+```
+
+On the same RTX A6000, the 44.75M-parameter diffusion decoder took a median
+`0.25060` seconds for 256 tokens using 62 full-sequence passes. The
+44.06M-parameter `gpt2-nano` decoder took `1.40847` seconds using 256 cached
+passes. The `5.62x` ratio applies only to this batch-one fixed-length workload.
+The diffusion output is blank, the objectives differ, and the autoregressive
+path starts from one token, so this result does not establish model superiority.
 
 ## FineWeb-Edu provenance
 
-The publication configuration is designed for token blocks that an operator may derive locally from [HuggingFaceFW/fineweb-edu](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu). This repository does not fetch, transform, package, or redistribute FineWeb-Edu.
+The publication checkpoint uses the first 10-million-token shard from the
+existing `kotlarmilos/gpt2-nano` model repository at pinned revision
+`ee547b4112bce2d2557dd0975038035bab6c86eb`. That project prepared its custom
+BPE tokens from a FineWeb-Edu subset. This repository does not fetch raw
+FineWeb-Edu documents, transform them, or redistribute them.
 
 The FineWeb-Edu dataset card identifies the collection license as ODC-By 1.0. Web documents can also carry rights and usage conditions from their original sources. Anyone preparing a local training split must review the current dataset card, preserve required attribution, respect source restrictions, and record the exact dataset revision and filtering procedure. There is no dataset card here because this project creates no derived dataset.
 
@@ -85,12 +129,9 @@ A comparison with autoregressive gpt2-nano must hold tokenizer, data split, para
 
 Quality needs held-out metrics appropriate to each objective and blinded sample
 review. Diffusion masked-token cross entropy is not directly comparable with
-next-token cross entropy. The benchmark accepts `--autoregressive-checkpoint`
-and loads the exact staged `gpt2-nano` implementation. Without that argument it
-records the baseline as pending rather than inserting a number from a different
-machine or checkpoint. The artifact also states that diffusion is
-fixed-length and unconditional while the autoregressive path starts from one
-prompt token.
+next-token cross entropy. The measured benchmark loads the exact staged
+`gpt2-nano` implementation and records that diffusion is fixed-length and
+unconditional while the autoregressive path starts from one prompt token.
 
 ## Publication run
 
@@ -107,7 +148,11 @@ training, evaluation, adaptive decoding study, and benchmarking in one command:
 ./scripts/colab_publication.sh
 ```
 
-`artifacts/manifest.json` distinguishes measured outputs from simulations and pending work. Generated checkpoints remain ignored by Git by default.
+`artifacts/manifest.json` distinguishes measured outputs from simulations and
+pending work. The repository tracks the measured JSON evidence and the small
+development checkpoint so a clean checkout can verify the reported results.
+The 179 MB publication checkpoint remains ignored because it belongs in the
+Hugging Face model repository, not in Git history.
 
 ## Space
 

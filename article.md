@@ -18,6 +18,12 @@ discrete diffusion corrupts a clean sequence, trains a bidirectional Transformer
 restore it, and then generates by revealing masked positions over several parallel
 passes.
 
+The measured result is negative. A clean 10,000-step RTX A6000 run collapsed
+onto the end-of-word token, and adaptive calibration selected no early-stop
+rule. Diffusion completed one fixed-length timing workload `5.62x` faster than
+`gpt2-nano`, but its generated sample is blank. The timing is a systems
+measurement, not evidence of language quality or overall model superiority.
+
 ## The problem
 
 An autoregressive model learns from a shifted sequence. Every position predicts the
@@ -117,29 +123,63 @@ line references.
 
 ## Results and honesty boundary
 
-Parallel token updates sound automatically faster until sequence-wide work,
-denoising steps, hardware utilization, and batching enter the calculation.
-Autoregressive caching is strong. Diffusion exposes a different latency profile and
-can revise unresolved positions, but neither fact supplies a benchmark result by
-itself. There are no comparative performance numbers in this release candidate
-because I did not run that controlled experiment here.
+The publication checkpoint came from clean source commit `2bb34f0` and has
+SHA-256 `96f78f1d51fab2a365142bf2a861feb109633a189658fd97864087e913c3a9db`.
+The run used 10,000 optimizer steps, 10 million tokens from the pinned
+`gpt2-nano` FineWeb-Edu shard, and the 9,157-token custom BPE vocabulary. The
+checkpoint records `git_dirty: false` at training start.
 
-The included benchmark records diffusion wall time for a supplied checkpoint. It
-can also load the exact local `gpt2-nano` implementation and checkpoint, then time
-both models in the same process. The publication denoiser has about 44.75M
-parameters, close to the 44.06M autoregressive model. That makes the comparison
-more controlled, but not identical. Diffusion performs fixed-length unconditional
-generation while `gpt2-nano` starts from one prompt token. The artifact records
-that limitation alongside the generated length, batch size, precision, hardware,
-warmup policy, random seed, and number of forward passes.
+### The quality result is negative
 
-The objectives require care as well. Masked-token denoising loss and next-token
-autoregressive loss answer different questions. Putting those two loss values in one
-table would create a precise-looking comparison with no stable interpretation. The
-publication workflow withholds a contiguous tail of the token corpus and evaluates
-denoising cross entropy and masked-token accuracy across multiple sequences from
-that region. A final comparison still needs the autoregressive model's own held-out
-metrics, blinded samples, and the complete decoding configuration.
+Evaluation at diffusion time `0.5` covered 256 contiguous held-out sequences
+and 19,390 randomly masked tokens. Masked-token accuracy was `0.36029`, and
+masked cross entropy was `5.14059`.
+
+That accuracy does not establish useful denoising. Token `9156`, the
+`<|EOW|>` token that decodes as a space, occupies `0.36205` of all 65,536
+positions in the same held-out sequences. This constant-token control uses all
+positions while evaluation uses the randomly corrupted positions, so the two
+figures are not an exact paired comparison. Their near equality is still an
+important warning. The unconditional sample confirms the failure. All 256
+generated positions are token `9156`, producing 256 spaces and no readable
+text. I therefore treat this checkpoint as collapsed and make no language
+quality claim.
+
+### Adaptive stopping rejected early stopping
+
+The adaptive study used 32 calibration sequences and a later disjoint window of
+128 held-out sequences. Calibration compared 12 preregistered configurations
+with a maximum of 32 passes. It selected `min_passes = 4`,
+`entropy_threshold = 0`, `confidence_delta = 0`, and
+`confidence_patience = 0`. The zero thresholds disable both early-stop rules.
+
+On held-out data, confidence and adaptive decoding were numerically identical
+at the aggregate level. Both recovered `7,334/20,284` initially masked tokens,
+for accuracy `0.36157`. Both recovered zero complete sequences. Every example
+used all 32 forward passes and stopped at the maximum. Fixed-order and
+fixed-fraction accuracy were `0.25597` and `0.25419`. Adaptive mean wall time
+was `0.13782` seconds per example versus `0.12537` for confidence, but this
+field includes Python control overhead and does not support a decoder speed
+claim. The experiment answers the extension question negatively. The calibrated
+rules did not reduce work or improve reconstruction.
+
+### The timing result is workload-specific
+
+The same-host benchmark used an NVIDIA RTX A6000, PyTorch `2.4.1+cu124`,
+batch size one, 256 output tokens, five timed repeats, and float32 execution.
+
+| Decoder | Parameters | Network passes | Median seconds |
+| --- | ---: | ---: | ---: |
+| Diffusion | 44,749,824 | 62 full-sequence passes | 0.25060 |
+| `gpt2-nano` with KV cache | 44,062,661 | 256 cached passes | 1.40847 |
+
+The nominal ratio is `5.62x` in favor of diffusion for this exact systems
+workload. It is not a model-superiority result. Diffusion performs fixed-length
+unconditional generation, while `gpt2-nano` starts from one token and follows a
+different objective. The models do not have matched quality, the diffusion
+sample is blank, and no blinded sample review was performed. The benchmark only
+shows that 62 parallel full-sequence passes completed faster than 256 cached
+autoregressive passes under this configuration.
 
 The smoke path uses a byte tokenizer so the repository can run without downloading
 data or a tokenizer. Bytes make a poor final vocabulary, but they make the smallest
@@ -161,43 +201,28 @@ always help. Confidence ordering matches fixed order at one step and beats it at
 every larger equal budget in this run. The corpus is synthetic and local, so this
 result demonstrates decoding behavior, not publication-scale language quality.
 
-**Pending adaptive extension question.** The new study asks whether calibrated
-entropy or stalled confidence can finalize unresolved positions before a declared
-maximum-pass budget while preserving held-out reconstruction. Adaptive thresholds
-are selected on a dedicated calibration window and evaluated once on a later
-non-overlapping corpus window alongside fixed-order, fixed-fraction, and confidence
-policies with identical corruptions, seeds, checkpoint, precision, and hardware.
-The selected threshold is pending. Calibration metrics are pending. Initially
-masked token accuracy is pending. Exact sequence recovery is pending. Realized
-forward passes are pending. Stopping-reason counts are pending. Wall time is
-pending and will include Python overhead, so it will not alone support a speed
-claim. Paired per-example results are pending. No real-corpus GPU result is claimed
-in this repository state.
-
 The publication path meets the previous `gpt2-nano` project at the data boundary.
 An adapter loads that project's custom BPE vocabulary and merge table. Two IDs after
 its 9,157-token vocabulary are reserved for padding and masking. Dataset adapters
-read the common little-endian unsigned sixteen-bit token stream or JSON lines
-containing token ID arrays. This path is a reference, not a copy operation. Private
-tokenizers, checkpoints, and tokenized corpora stay where they already live.
-FineWeb-Edu is handled the same way. The project documents the upstream Hugging Face
-dataset and its ODC-By 1.0 collection license, but it does not redistribute
-documents or a derived split. `configs/publication.toml` defines the approximately
-parameter-matched 12-layer run with the same custom vocabulary and token shard as
-the base project. It is not presented as a tuned recipe. The input-preparation
-script verifies the tokenizer, corpus, and autoregressive checkpoint by SHA-256. The
-Colab workflow trains the denoiser, evaluates the held-out corpus region, times
-both decoders on the same hardware, and writes provenance records into the artifact
-manifest.
+read the common shard format with a 1,024-byte metadata header followed by
+little-endian unsigned sixteen-bit token IDs, or JSON lines containing token ID
+arrays. The parser validates the magic value, version, declared count, exact
+file size, endianness, and vocabulary range before training.
+
+The publication checkpoint uses the pinned `gpt2-nano` shard rather than a new
+derived dataset. The input-preparation script downloads the tokenizer, corpus,
+and autoregressive checkpoint from immutable locations and verifies each
+SHA-256. FineWeb-Edu identifies the collection license as ODC-By 1.0, while
+original web documents can retain additional rights and conditions.
 
 Every generated result has one of three states. Measured means a command actually
 produced it. Simulated means it is synthetic demonstration data and cannot support
-an empirical claim. Pending means the run has not happened. Missing dependencies
-leave the smoke checkpoint pending rather than encouraging someone to mistake an
-invented file for evidence. The Space contains the interface and trajectory
-visualization, but it requires a real checkpoint path. Watching positions become
-readable over successive passes is the quickest way to see the algorithm. Shipping
-random output under a model label would make that visualization misleading.
+an empirical claim. Pending means the run has not happened. A command that lacks
+its required checkpoint records the missing comparison as pending rather than
+inserting an invented result. The Space contains the interface and trajectory
+visualization, but it requires a real checkpoint path. The publication checkpoint
+does not produce readable text because it collapsed, and the Space must display
+that limitation rather than implying a successful text model.
 
 Expected publication locations, not yet live:
 

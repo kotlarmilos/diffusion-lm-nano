@@ -519,7 +519,7 @@ Pareto frontier improves through three reveal steps and then stops improving.
 Confidence ordering ties fixed order when one step reveals every selected mask
 and beats fixed order at every larger budget in this development-scale run.
 
-### Pending adaptive publication protocol
+### Measured adaptive publication protocol
 
 The adaptive question is whether confidence and entropy can identify examples
 whose unresolved predictions are ready to finalize before a declared
@@ -537,10 +537,24 @@ fixed-fraction, confidence, and the selected adaptive policy. The artifact
 stores paired per-example metrics and trajectories, actual forward calls,
 stopping reasons, synchronized wall time, input hashes, precision, and hardware.
 The wall-time field includes Python overhead and cannot support a speed claim by
-itself. All real-corpus GPU result fields remain pending until that command
-produces and hashes the publication artifact.
+itself.
 
-## Honesty boundary: what is measured and what remains pending
+The RTX A6000 run calibrated 12 configurations on 32 sequences. It selected
+`min_passes = 4`, `entropy_threshold = 0`, `confidence_delta = 0`, and
+`confidence_patience = 0`. Both zero-valued criteria are disabled by
+construction. Calibration therefore rejected early stopping.
+
+The later 128-sequence held-out window confirms that result. Adaptive and
+ordinary confidence decoding both recover `7,334/20,284` initially masked
+tokens for accuracy `0.3615657661`. Both recover zero complete sequences. Every
+example uses all 32 declared passes and stops because it reaches the maximum.
+Adaptive mean wall time is `0.1378213` seconds per example, while confidence
+mean wall time is `0.1253742` seconds. That difference reflects the measured
+Python-inclusive implementation and does not establish a general speed effect.
+The study answers the extension question negatively. The calibrated policy
+does not reduce passes or improve reconstruction.
+
+## Honesty boundary and measured-result interpretation
 
 ### Motivation
 
@@ -577,46 +591,58 @@ hardware, warmup, and metrics. Diffusion masked-token cross entropy and
 autoregressive next-token cross entropy answer different questions, so one
 should not place them in one table as if they were the same measurement.
 
+### The majority-token control
+
+The publication evaluation reports masked-token accuracy `0.3602888` over
+19,390 randomly corrupted positions from 256 held-out sequences. Accuracy alone
+can hide a trivial predictor when the vocabulary is imbalanced. The control in
+`scripts/analyze_publication_baseline.py` counts every token in those same
+sequences and finds that token `9156` occupies `0.3620453` of all positions.
+Token `9156` is `<|EOW|>`, which the adapter decodes as a space.
+
+The two values use different position sets. The evaluation uses random masks,
+while the control uses the complete sequences. Their difference is therefore
+descriptive rather than an exact paired estimate.
+
+```
+masked accuracy                          = 0.3602888
+complete-holdout majority-token fraction = 0.3620453
+difference                               = -0.0017565
+```
+
+The unconditional sample resolves the ambiguity. All 256 positions are token
+`9156`, so the generated string contains only spaces. A metric near the
+majority-token frequency plus a one-token-support sample is evidence of
+collapse, not useful denoising.
+
+### The timing boundary
+
+The same-host benchmark controls hardware, precision, generated length, batch
+size, warmup, and implementation provenance. The 44.75M-parameter diffusion
+model uses 62 full-sequence passes and takes median `0.2505967` seconds. The
+44.06M-parameter `gpt2-nano` model uses 256 cached passes and takes median
+`1.4084736` seconds. The ratio is `5.62x` for that exact workload.
+
+This ratio does not compare equivalent language models. Diffusion is
+unconditional and fixed-length. `gpt2-nano` starts from one prompt token. Their
+training objectives differ, and the diffusion checkpoint produces blank text.
+The valid claim is limited to the measured execution paths. Under this
+configuration, 62 full-sequence diffusion passes finished faster than 256
+cached autoregressive passes. No quality or overall-superiority conclusion
+follows.
+
 ### Where it lives in the code
 
-`article.md` states the boundary in prose. Lines 55 to 62 describe the
-benchmark protocol and its limitations. Lines 64 to 71 explain why diffusion
-masked-token loss and autoregressive next-token loss need separate
-interpretation. Line 73 says that this release candidate does not include
-comparative performance numbers. Lines 91 to 100 describe the smoke
-configuration and the measured, simulated, and pending status categories.
+`configs/smoke.toml` records the deterministic pipeline check.
+`configs/publication.toml` records the 10,000-step measured training run.
+`configs/adaptive_study_publication.toml` records the calibrated adaptive
+protocol. `src/diffusion_lm_nano/artifacts.py` binds measured artifacts to
+hashes and provenance. `scripts/analyze_publication_baseline.py` computes the
+constant-token control from the exact evaluated holdout sequences.
 
-`configs/smoke.toml` records the smoke path. Lines 1 to 10 define a tiny byte
-model with `vocab_size = 258`, `mask_token_id = 257`, and `pad_token_id = 256`.
-Lines 12 to 18 set a linear schedule, six sampling steps, confidence decoding,
-and greedy temperature zero. Lines 20 to 27 set CPU execution, seed seven, batch
-size two, and four optimizer steps.
-
-`configs/publication.toml` records the intended larger path. Lines 1 to 10 set
-the 9,159-token vocabulary with `pad_token_id = 9157` and `mask_token_id =
-9158`. Lines 12 to 18 set cosine diffusion, 64 sampling steps, confidence
-decoding, and temperature `0.8`. Lines 20 to 29 set the training seed, 10,000
-steps, batch size 32, an external `data/train.bin`, and the contiguous tail
-validation fraction.
-
-`src/diffusion_lm_nano/artifacts.py` enforces status vocabulary for generated
-artifacts. Lines 20 to 29 define `record_artifact` and accept only `measured`,
-`simulated`, or `pending`. Lines 35 to 42 record path, kind, status, hash,
-byte size, and provenance. Lines 43 to 53 update the manifest.
-
-`src/diffusion_lm_nano/benchmark.py` keeps comparison claims explicit. Lines
-121 to 127 record the autoregressive result as pending when no compatible
-checkpoint is supplied. Lines 183 to 217 write measured diffusion timing fields
-and the comparison protocol only after the benchmark command runs.
-
-`artifacts/manifest.json` records the current state. Lines 28 to 39 mark the
-smoke benchmark as measured. Lines 40 to 82 mark the smoke checkpoint as
-measured. Lines 83 to 94 mark smoke evaluation as measured. Lines 95 to 137
-mark the smoke iterative sample as measured. Lines 3 to 26 mark the publication
-checkpoint and publication sample as pending. Lines 162 to 166 define
-`measured`, `pending`, and `simulated`.
-
-`SIGNOFF.md` matches that boundary. Lines 17 to 27 state that local smoke
-training, evaluation, and timing completed, while publication training and the
-same-hardware publication comparison remain pending. The same section states
-that no comparative performance or quality claim is asserted.
+`artifacts/manifest.json` is the authoritative index for the checkpoint,
+sample, held-out evaluation, adaptive study, timing benchmark, and
+majority-token control. `article.md`, `README.md`, `hf/README.md`, and
+`SIGNOFF.md` preserve the same boundary. The checkpoint is a reproducible
+negative model-quality result with a separately valid workload-specific systems
+measurement.

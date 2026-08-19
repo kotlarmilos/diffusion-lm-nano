@@ -151,7 +151,10 @@ with gr.Blocks(css=".mask{color:#999}.special{color:#a33}pre{white-space:pre-wra
         "# diffusion-lm-nano\n"
         "This Space requires a compatible checkpoint through `CHECKPOINT_PATH`. "
         "Publication checkpoints also require the matching tokenizer through "
-        "`TOKENIZER_PATH`. It displays every parallel reveal step."
+        "`TOKENIZER_PATH`. It displays every parallel reveal step.\n\n"
+        "**Measured result:** The 10,000-step publication checkpoint collapsed "
+        "onto the end-of-word token and produces blank output. This interface "
+        "visualizes that failure rather than presenting a usable language model."
     )
     with gr.Row():
         length = gr.Slider(1, 256, value=24, step=1, label="Token length")

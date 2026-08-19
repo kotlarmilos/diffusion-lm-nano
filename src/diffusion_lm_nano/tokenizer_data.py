@@ -105,7 +105,7 @@ class GPT2NanoTokenizerAdapter:
 
 
 class BinaryTokenDataset(Dataset[Tensor]):
-    """Read contiguous little-endian uint16 token blocks used by gpt2-nano."""
+    """Read headered little-endian uint16 token blocks used by gpt2-nano."""
 
     def __init__(
         self,

@@ -1,43 +1,64 @@
 {
   "artifacts": [
     {
-      "bytes": null,
+      "bytes": 7746925,
       "kind": "adaptive-decoding-study",
       "path": "artifacts/adaptive-decoding-publication.json",
       "provenance": {
+        "calibration_window": {
+          "end_dataset_index_exclusive": 35187,
+          "sequences": 32,
+          "start_dataset_index": 35155
+        },
+        "checkpoint": "artifacts/publication-checkpoint.pt",
         "command": "python -m diffusion_lm_nano.adaptive_study --config configs/adaptive_study_publication.toml",
-        "config": "configs/adaptive_study_publication.toml",
+        "corpus": "data/train.bin",
+        "device": "cuda",
+        "heldout_window": {
+          "end_dataset_index_exclusive": 35315,
+          "sequences": 128,
+          "start_dataset_index": 35187
+        },
         "immutable_input_expectations": {
           "checkpoint": {
+            "observed_sha256": "96f78f1d51fab2a365142bf2a861feb109633a189658fd97864087e913c3a9db",
             "path": "artifacts/publication-checkpoint.pt",
-            "sha256": "must equal the measured manifest entry at execution",
+            "sha256": "96f78f1d51fab2a365142bf2a861feb109633a189658fd97864087e913c3a9db",
             "status": "measured"
           },
           "corpus": {
+            "observed_sha256": "f08410ea036cc56b78ffc3f6edbf94f5a1d469aeb7c708bb56e4ce544623a69e",
             "path": "data/train.bin",
             "sha256": "f08410ea036cc56b78ffc3f6edbf94f5a1d469aeb7c708bb56e4ce544623a69e"
           },
           "study_config": {
+            "observed_sha256": "352ba4a151ea77764f14ad8062b66776ea844738e4d37a7d0ec730bcdcf52028",
             "path": "configs/adaptive_study_publication.toml",
             "sha256": "352ba4a151ea77764f14ad8062b66776ea844738e4d37a7d0ec730bcdcf52028"
           },
           "training_config": {
+            "observed_sha256": "9cd8db87701526814ec650500e1e9d929172488bd5ed5d6c7067eb68a64f20ce",
             "path": "configs/publication.toml",
             "sha256": "9cd8db87701526814ec650500e1e9d929172488bd5ed5d6c7067eb68a64f20ce"
           }
         },
-        "protocol": {
-          "calibration_sequences": 32,
-          "device": "cuda",
-          "hardware_target": "one RTX A6000",
-          "heldout_sequences": 128,
-          "max_passes": 32,
-          "precision": "float32",
-          "reason": "Real-corpus GPU calibration and held-out evaluation have not been run."
+        "input_sha256": {
+          "checkpoint": "96f78f1d51fab2a365142bf2a861feb109633a189658fd97864087e913c3a9db",
+          "corpus": "f08410ea036cc56b78ffc3f6edbf94f5a1d469aeb7c708bb56e4ce544623a69e",
+          "study_config": "352ba4a151ea77764f14ad8062b66776ea844738e4d37a7d0ec730bcdcf52028",
+          "training_config": "9cd8db87701526814ec650500e1e9d929172488bd5ed5d6c7067eb68a64f20ce"
+        },
+        "precision": "float32",
+        "seed": 20260818,
+        "selected_adaptive_config": {
+          "confidence_delta": 0.0,
+          "confidence_patience": 0,
+          "entropy_threshold": 0.0,
+          "min_passes": 4
         }
       },
-      "sha256": null,
-      "status": "pending"
+      "sha256": "a0ba4b1013b8706b4afab7e7264f79d405ef624b814c2650138bdd249e021227",
+      "status": "measured"
     },
     {
       "bytes": 26624,
@@ -175,28 +196,150 @@
       "status": "measured"
     },
     {
-      "bytes": null,
+      "bytes": 1472,
+      "kind": "benchmark",
+      "path": "artifacts/publication-benchmark.json",
+      "provenance": {
+        "checkpoint": "artifacts/publication-checkpoint.pt",
+        "command": "python -m diffusion_lm_nano.benchmark",
+        "device": "cuda",
+        "seed": 19
+      },
+      "sha256": "54b029c612ef991641426a2b2e6fbbce9c27d577b4bb91084397de2536386e40",
+      "status": "measured"
+    },
+    {
+      "bytes": 179059110,
       "kind": "model-checkpoint",
       "path": "artifacts/publication-checkpoint.pt",
       "provenance": {
-        "command": "./scripts/train_publication.sh",
-        "config": "configs/publication.toml",
-        "reason": "Publication training has not been run."
+        "command": "python -m diffusion_lm_nano.train --config configs/publication.toml --checkpoint artifacts/publication-checkpoint.pt --sample artifacts/publication-sample.json --manifest artifacts/manifest.json",
+        "config": {
+          "diffusion": {
+            "adaptive_confidence_delta": 0.0,
+            "adaptive_confidence_patience": 0,
+            "adaptive_entropy_threshold": 0.0,
+            "adaptive_min_passes": 1,
+            "sampling_steps": 64,
+            "schedule": "cosine",
+            "schedule_power": 2.0,
+            "strategy": "confidence",
+            "temperature": 0.8,
+            "train_min_t": 0.001
+          },
+          "model": {
+            "d_ff": 2048,
+            "d_model": 512,
+            "dropout": 0.1,
+            "mask_token_id": 9158,
+            "max_length": 256,
+            "n_heads": 8,
+            "n_layers": 12,
+            "pad_token_id": 9157,
+            "vocab_size": 9159
+          },
+          "train": {
+            "batch_size": 32,
+            "corpus_path": "data/train.bin",
+            "device": "auto",
+            "learning_rate": 0.0003,
+            "log_every": 100,
+            "seed": 2026,
+            "steps": 10000,
+            "validation_fraction": 0.1,
+            "weight_decay": 0.01
+          }
+        },
+        "seed": 2026,
+        "source": {
+          "git_dirty": false,
+          "git_revision": "2bb34f0516d531acfbcd5df8ee66c5e8cd80d1b6",
+          "git_state_captured": "training_start",
+          "git_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
       },
-      "sha256": null,
-      "status": "pending"
+      "sha256": "96f78f1d51fab2a365142bf2a861feb109633a189658fd97864087e913c3a9db",
+      "status": "measured"
     },
     {
-      "bytes": null,
+      "bytes": 282,
+      "kind": "evaluation",
+      "path": "artifacts/publication-evaluation.json",
+      "provenance": {
+        "checkpoint": "artifacts/publication-checkpoint.pt",
+        "command": "python -m diffusion_lm_nano.evaluate",
+        "device": "cuda",
+        "seed": 11
+      },
+      "sha256": "a640af60fef7b71246110fd38dbccaa5b452391ae1ab19dc29f7b988225a6031",
+      "status": "measured"
+    },
+    {
+      "bytes": 1824,
+      "kind": "majority-token-control",
+      "path": "artifacts/publication-majority-control.json",
+      "provenance": {
+        "checkpoint": "artifacts/publication-checkpoint.pt",
+        "command": "python scripts/analyze_publication_baseline.py",
+        "corpus": "data/train.bin",
+        "evaluation": "artifacts/publication-evaluation.json",
+        "sample": "artifacts/publication-sample.json"
+      },
+      "sha256": "d2c47dd2a50298d04555f870c9edd31f71af37f791a637eb009487c0b34fea5b",
+      "status": "measured"
+    },
+    {
+      "bytes": 254286,
       "kind": "iterative-sample",
       "path": "artifacts/publication-sample.json",
       "provenance": {
-        "command": "./scripts/train_publication.sh",
-        "config": "configs/publication.toml",
-        "reason": "Publication training has not been run."
+        "command": "python -m diffusion_lm_nano.train --config configs/publication.toml --checkpoint artifacts/publication-checkpoint.pt --sample artifacts/publication-sample.json --manifest artifacts/manifest.json",
+        "config": {
+          "diffusion": {
+            "adaptive_confidence_delta": 0.0,
+            "adaptive_confidence_patience": 0,
+            "adaptive_entropy_threshold": 0.0,
+            "adaptive_min_passes": 1,
+            "sampling_steps": 64,
+            "schedule": "cosine",
+            "schedule_power": 2.0,
+            "strategy": "confidence",
+            "temperature": 0.8,
+            "train_min_t": 0.001
+          },
+          "model": {
+            "d_ff": 2048,
+            "d_model": 512,
+            "dropout": 0.1,
+            "mask_token_id": 9158,
+            "max_length": 256,
+            "n_heads": 8,
+            "n_layers": 12,
+            "pad_token_id": 9157,
+            "vocab_size": 9159
+          },
+          "train": {
+            "batch_size": 32,
+            "corpus_path": "data/train.bin",
+            "device": "auto",
+            "learning_rate": 0.0003,
+            "log_every": 100,
+            "seed": 2026,
+            "steps": 10000,
+            "validation_fraction": 0.1,
+            "weight_decay": 0.01
+          }
+        },
+        "seed": 2026,
+        "source": {
+          "git_dirty": false,
+          "git_revision": "2bb34f0516d531acfbcd5df8ee66c5e8cd80d1b6",
+          "git_state_captured": "training_start",
+          "git_status_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
       },
-      "sha256": null,
-      "status": "pending"
+      "sha256": "0626020efbd69504a045a1e38fe75ef7f3c6966608312215f1a0e5a80f42efe4",
+      "status": "measured"
     },
     {
       "bytes": 1078,
@@ -310,14 +453,14 @@
       "status": "measured"
     },
     {
-      "bytes": 42197,
+      "bytes": 42903,
       "kind": "runtime-wheel",
       "path": "space/diffusion_lm_nano-0.1.0rc1-py3-none-any.whl",
       "provenance": {
         "command": "python -m build --wheel",
         "reason": "Standalone Space runtime built from this working tree."
       },
-      "sha256": "12deedb976e5f3f019072ddddcb486348972b7673b1605ba96b89eb3c57ad6c0",
+      "sha256": "2d6087acfc17e16c56f2858bad16bf0c5f9fc496572eef354093cdc4560443ae",
       "status": "release-candidate"
     },
     {
@@ -338,5 +481,5 @@
     "pending": "Not produced in this repository state.",
     "simulated": "Synthetic demonstration output that cannot support an empirical claim."
   },
-  "updated_at": "2026-08-18T21:51:32.630374+00:00"
+  "updated_at": "2026-08-19T00:50:47.589570+00:00"
 }

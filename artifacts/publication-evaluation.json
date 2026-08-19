@@ -1,0 +1,11 @@
+{
+  "status": "measured",
+  "device": "cuda",
+  "seed": 11,
+  "timestep": 0.5,
+  "source": "contiguous tail holdout from data/train.bin",
+  "evaluated_sequences": 256,
+  "masked_tokens": 19390,
+  "masked_accuracy": 0.36028880866425994,
+  "masked_cross_entropy": 5.140590899306638
+}

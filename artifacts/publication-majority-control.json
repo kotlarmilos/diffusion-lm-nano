@@ -1,0 +1,52 @@
+{
+  "evaluation": {
+    "accuracy_minus_holdout_majority_fraction": -0.0017564794216775592,
+    "comparison_limit": "The constant-token control uses every token in the evaluated sequences; masked accuracy uses the randomly corrupted positions.",
+    "masked_token_accuracy": 0.36028880866425994
+  },
+  "holdout": {
+    "end_dataset_index_exclusive": 35411,
+    "majority_token_count": 23727,
+    "majority_token_fraction": 0.3620452880859375,
+    "majority_token_id": 9156,
+    "majority_token_piece": "<|EOW|>",
+    "sequences": 256,
+    "start_dataset_index": 35155,
+    "tokens": 65536
+  },
+  "inputs": {
+    "checkpoint": {
+      "path": "artifacts/publication-checkpoint.pt",
+      "sha256": "96f78f1d51fab2a365142bf2a861feb109633a189658fd97864087e913c3a9db"
+    },
+    "config": {
+      "path": "configs/publication.toml",
+      "sha256": "9cd8db87701526814ec650500e1e9d929172488bd5ed5d6c7067eb68a64f20ce"
+    },
+    "corpus": {
+      "path": "data/train.bin",
+      "sha256": "f08410ea036cc56b78ffc3f6edbf94f5a1d469aeb7c708bb56e4ce544623a69e"
+    },
+    "evaluation": {
+      "path": "artifacts/publication-evaluation.json",
+      "sha256": "a640af60fef7b71246110fd38dbccaa5b452391ae1ab19dc29f7b988225a6031"
+    },
+    "sample": {
+      "path": "artifacts/publication-sample.json",
+      "sha256": "0626020efbd69504a045a1e38fe75ef7f3c6966608312215f1a0e5a80f42efe4"
+    },
+    "vocabulary": {
+      "path": "data/bpe-tokenizer/vocab.json",
+      "sha256": "459dba6d2c6ae095718de3db92119bf5cefe19eb9dc0a88781687a5f74f7a4a3"
+    }
+  },
+  "method": "constant-token control over the complete evaluated holdout sequences",
+  "status": "measured",
+  "unconditional_sample": {
+    "all_majority_token": true,
+    "forward_passes": 62,
+    "stopping_reason": "all_revealed",
+    "tokens": 256,
+    "unique_token_ids": 1
+  }
+}

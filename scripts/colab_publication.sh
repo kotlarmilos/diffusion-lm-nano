@@ -25,6 +25,8 @@ fi
   --output artifacts/publication-evaluation.json \
   --manifest artifacts/manifest.json
 
+"$PYTHON" scripts/analyze_publication_baseline.py
+
 PYTHON="$PYTHON" ./scripts/run_adaptive_study.sh \
   configs/adaptive_study_publication.toml
 

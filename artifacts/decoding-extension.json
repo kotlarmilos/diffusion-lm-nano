@@ -1,0 +1,344 @@
+{
+  "batch_size": 16,
+  "best_by_steps": [
+    {
+      "network_forward_passes": 4,
+      "ordering_strategy": "confidence",
+      "steps": 1,
+      "token_accuracy": 0.3277310924369748
+    },
+    {
+      "network_forward_passes": 8,
+      "ordering_strategy": "confidence",
+      "steps": 2,
+      "token_accuracy": 0.3445378151260504
+    },
+    {
+      "network_forward_passes": 12,
+      "ordering_strategy": "confidence",
+      "steps": 3,
+      "token_accuracy": 0.3634453781512605
+    },
+    {
+      "network_forward_passes": 16,
+      "ordering_strategy": "confidence",
+      "steps": 4,
+      "token_accuracy": 0.33613445378151263
+    },
+    {
+      "network_forward_passes": 24,
+      "ordering_strategy": "confidence",
+      "steps": 6,
+      "token_accuracy": 0.3235294117647059
+    },
+    {
+      "network_forward_passes": 40,
+      "ordering_strategy": "confidence",
+      "steps": 12,
+      "token_accuracy": 0.3235294117647059
+    }
+  ],
+  "checkpoint": "artifacts/decoding-signal-checkpoint.pt",
+  "checkpoint_config": {
+    "diffusion": {
+      "sampling_steps": 12,
+      "schedule": "linear",
+      "schedule_power": 2.0,
+      "strategy": "confidence",
+      "temperature": 0.0,
+      "train_min_t": 0.05
+    },
+    "model": {
+      "d_ff": 128,
+      "d_model": 64,
+      "dropout": 0.0,
+      "mask_token_id": 257,
+      "max_length": 12,
+      "n_heads": 4,
+      "n_layers": 2,
+      "pad_token_id": 256,
+      "vocab_size": 258
+    },
+    "train": {
+      "batch_size": 32,
+      "corpus_path": "artifacts/decoding-copy-corpus.jsonl",
+      "device": "cpu",
+      "learning_rate": 0.001,
+      "log_every": 1000,
+      "seed": 29,
+      "steps": 8000,
+      "validation_fraction": 0.1,
+      "weight_decay": 0.0
+    }
+  },
+  "config": {
+    "diffusion": {
+      "sampling_steps": 12,
+      "schedule": "linear",
+      "schedule_power": 2.0,
+      "strategy": "confidence",
+      "temperature": 0.0,
+      "train_min_t": 0.05
+    },
+    "model": {
+      "d_ff": 128,
+      "d_model": 64,
+      "dropout": 0.0,
+      "mask_token_id": 257,
+      "max_length": 12,
+      "n_heads": 4,
+      "n_layers": 2,
+      "pad_token_id": 256,
+      "vocab_size": 258
+    },
+    "train": {
+      "batch_size": 32,
+      "corpus_path": "artifacts/decoding-copy-corpus.jsonl",
+      "device": "cpu",
+      "learning_rate": 0.001,
+      "log_every": 1000,
+      "seed": 29,
+      "steps": 8000,
+      "validation_fraction": 0.1,
+      "weight_decay": 0.0
+    }
+  },
+  "config_path": "configs/decoding_signal.toml",
+  "environment": {
+    "device": "cpu",
+    "device_name": "arm",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "python": "3.13.3",
+    "torch": "2.13.0"
+  },
+  "hypotheses": {
+    "confidence_ordering_dominates_fixed_order": {
+      "max_accuracy_delta": 0.04411764705882354,
+      "min_accuracy_delta": 0.0,
+      "status": "supported_development_scale"
+    },
+    "more_reveal_steps_help_and_saturate": {
+      "knee_steps": 3,
+      "max_token_accuracy": 0.3634453781512605,
+      "monotonic_non_decreasing": false,
+      "monotonic_to_knee": true,
+      "status": "knee_observed_development_scale",
+      "tolerance": 0.0
+    }
+  },
+  "initial_timestep": 0.75,
+  "max_sequences": 64,
+  "metric": {
+    "definition": "final decoded token match rate over positions selected by initial corruption",
+    "name": "initial_masked_token_accuracy"
+  },
+  "ordering_comparison": [
+    {
+      "accuracy_delta": 0.0,
+      "baseline": "fixed_order",
+      "baseline_token_accuracy": 0.3277310924369748,
+      "primary": "confidence",
+      "primary_token_accuracy": 0.3277310924369748,
+      "steps": 1
+    },
+    {
+      "accuracy_delta": 0.027310924369747913,
+      "baseline": "fixed_order",
+      "baseline_token_accuracy": 0.3172268907563025,
+      "primary": "confidence",
+      "primary_token_accuracy": 0.3445378151260504,
+      "steps": 2
+    },
+    {
+      "accuracy_delta": 0.04411764705882354,
+      "baseline": "fixed_order",
+      "baseline_token_accuracy": 0.31932773109243695,
+      "primary": "confidence",
+      "primary_token_accuracy": 0.3634453781512605,
+      "steps": 3
+    },
+    {
+      "accuracy_delta": 0.00840336134453784,
+      "baseline": "fixed_order",
+      "baseline_token_accuracy": 0.3277310924369748,
+      "primary": "confidence",
+      "primary_token_accuracy": 0.33613445378151263,
+      "steps": 4
+    },
+    {
+      "accuracy_delta": 0.00840336134453784,
+      "baseline": "fixed_order",
+      "baseline_token_accuracy": 0.31512605042016806,
+      "primary": "confidence",
+      "primary_token_accuracy": 0.3235294117647059,
+      "steps": 6
+    },
+    {
+      "accuracy_delta": 0.0063025210084033945,
+      "baseline": "fixed_order",
+      "baseline_token_accuracy": 0.3172268907563025,
+      "primary": "confidence",
+      "primary_token_accuracy": 0.3235294117647059,
+      "steps": 12
+    }
+  ],
+  "ordering_strategies": [
+    "confidence",
+    "fixed_order"
+  ],
+  "pareto_frontier": [
+    {
+      "network_forward_passes": 4,
+      "ordering_strategy": "confidence",
+      "steps": 1,
+      "token_accuracy": 0.3277310924369748
+    },
+    {
+      "network_forward_passes": 8,
+      "ordering_strategy": "confidence",
+      "steps": 2,
+      "token_accuracy": 0.3445378151260504
+    },
+    {
+      "network_forward_passes": 12,
+      "ordering_strategy": "confidence",
+      "steps": 3,
+      "token_accuracy": 0.3634453781512605
+    }
+  ],
+  "results": [
+    {
+      "correct_tokens": 156,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 4,
+      "ordering_strategy": "confidence",
+      "sampler_strategy": "confidence",
+      "steps": 1,
+      "token_accuracy": 0.3277310924369748
+    },
+    {
+      "correct_tokens": 164,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 8,
+      "ordering_strategy": "confidence",
+      "sampler_strategy": "confidence",
+      "steps": 2,
+      "token_accuracy": 0.3445378151260504
+    },
+    {
+      "correct_tokens": 173,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 12,
+      "ordering_strategy": "confidence",
+      "sampler_strategy": "confidence",
+      "steps": 3,
+      "token_accuracy": 0.3634453781512605
+    },
+    {
+      "correct_tokens": 160,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 16,
+      "ordering_strategy": "confidence",
+      "sampler_strategy": "confidence",
+      "steps": 4,
+      "token_accuracy": 0.33613445378151263
+    },
+    {
+      "correct_tokens": 154,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 24,
+      "ordering_strategy": "confidence",
+      "sampler_strategy": "confidence",
+      "steps": 6,
+      "token_accuracy": 0.3235294117647059
+    },
+    {
+      "correct_tokens": 154,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 40,
+      "ordering_strategy": "confidence",
+      "sampler_strategy": "confidence",
+      "steps": 12,
+      "token_accuracy": 0.3235294117647059
+    },
+    {
+      "correct_tokens": 156,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 4,
+      "ordering_strategy": "fixed_order",
+      "sampler_strategy": "fixed_order",
+      "steps": 1,
+      "token_accuracy": 0.3277310924369748
+    },
+    {
+      "correct_tokens": 151,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 8,
+      "ordering_strategy": "fixed_order",
+      "sampler_strategy": "fixed_order",
+      "steps": 2,
+      "token_accuracy": 0.3172268907563025
+    },
+    {
+      "correct_tokens": 152,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 12,
+      "ordering_strategy": "fixed_order",
+      "sampler_strategy": "fixed_order",
+      "steps": 3,
+      "token_accuracy": 0.31932773109243695
+    },
+    {
+      "correct_tokens": 156,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 16,
+      "ordering_strategy": "fixed_order",
+      "sampler_strategy": "fixed_order",
+      "steps": 4,
+      "token_accuracy": 0.3277310924369748
+    },
+    {
+      "correct_tokens": 150,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 24,
+      "ordering_strategy": "fixed_order",
+      "sampler_strategy": "fixed_order",
+      "steps": 6,
+      "token_accuracy": 0.31512605042016806
+    },
+    {
+      "correct_tokens": 151,
+      "evaluated_sequences": 52,
+      "evaluated_tokens": 476,
+      "network_forward_passes": 40,
+      "ordering_strategy": "fixed_order",
+      "sampler_strategy": "fixed_order",
+      "steps": 12,
+      "token_accuracy": 0.3172268907563025
+    }
+  ],
+  "scale": "development-scale local run",
+  "seed": 15,
+  "source": "contiguous tail holdout from artifacts/decoding-copy-corpus.jsonl",
+  "status": "measured",
+  "step_budgets": [
+    1,
+    2,
+    3,
+    4,
+    6,
+    12
+  ],
+  "validation_fraction": 0.1
+}

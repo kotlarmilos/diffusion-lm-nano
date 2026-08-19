@@ -1,0 +1,44 @@
+{
+  "status": "measured",
+  "environment": {
+    "platform": "Linux-5.15.0-139-generic-x86_64-with-glibc2.35",
+    "python": "3.11.10",
+    "torch": "2.4.1+cu124",
+    "device": "cuda",
+    "device_name": "NVIDIA RTX A6000"
+  },
+  "diffusion": {
+    "median_seconds": 0.25059668719768524,
+    "repeats": 5,
+    "batch_size": 1,
+    "generated_tokens_per_sample": 256,
+    "network_forward_passes": 62,
+    "stopping_reasons": [
+      "all_revealed",
+      "all_revealed",
+      "all_revealed",
+      "all_revealed",
+      "all_revealed"
+    ],
+    "parameter_count": 44749824,
+    "decoding": "fixed-length unconditional masked diffusion"
+  },
+  "autoregressive_gpt2_nano": {
+    "status": "measured",
+    "checkpoint": "checkpoints/gpt2-nano.pt",
+    "median_seconds": 1.4084735922515392,
+    "repeats": 5,
+    "batch_size": 1,
+    "generated_tokens_per_sample": 256,
+    "network_forward_passes": 256,
+    "parameter_count": 44062661,
+    "decoding": "greedy with KV cache from a one-token prompt"
+  },
+  "comparison_protocol": {
+    "hardware": "same machine and precision",
+    "tokenizer": "same existing gpt2-nano tokenizer through the local adapter",
+    "workload": "same generated token count and batch size; diffusion is unconditional while gpt2-nano starts from one token",
+    "timing": "synchronize accelerators, warm up, then report median wall time",
+    "quality": "held-out token metrics plus blinded samples; do not compare training loss directly"
+  }
+}

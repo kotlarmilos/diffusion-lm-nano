@@ -10,7 +10,15 @@ data/
 artifacts/*.pt
 artifacts/*.json
 !artifacts/manifest.json
+!artifacts/adaptive-decoding-publication.json
+!artifacts/decoding-extension.json
+!artifacts/decoding-signal-sample.json
+!artifacts/publication-benchmark.json
+!artifacts/publication-evaluation.json
+!artifacts/publication-majority-control.json
+!artifacts/publication-sample.json
 !artifacts/smoke-checkpoint.pt
+!artifacts/decoding-signal-checkpoint.pt
 !artifacts/smoke-benchmark.json
 !artifacts/smoke-evaluation.json
 !artifacts/smoke-sample.json
