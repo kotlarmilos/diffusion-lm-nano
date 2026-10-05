@@ -15,9 +15,9 @@ import torch
 from .artifacts import record_artifact
 from .config import DiffusionConfig, ModelConfig
 from .model import MaskedDiffusionTransformer
-from .sampler import sample_with_metadata
+from .runtime import select_device
+from .sampler import sample
 from .schedules import make_schedule
-from .train import select_device
 
 
 def synchronize(device: torch.device) -> None:
@@ -60,7 +60,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--device", default="auto")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--manifest", type=Path)
-    parser.add_argument("--autoregressive-checkpoint", type=Path)
+    parser.add_argument(
+        "--autoregressive-checkpoint",
+        type=Path,
+        required=True,
+    )
     args = parser.parse_args(argv)
     if min(args.batch_size, args.repeats) < 1 or args.warmup < 0:
         parser.error("batch size and repeats must be positive")
@@ -88,14 +92,14 @@ def main(argv: list[str] | None = None) -> None:
         else:
             generator = torch.Generator(device=device).manual_seed(seed)
 
-        sampling_result = sample_with_metadata(
+        sampling_result = sample(
             model,
             batch_size=args.batch_size,
             length=length,
             mask_token_id=model_config.mask_token_id,
             pad_token_id=model_config.pad_token_id,
             vocab_size=model_config.vocab_size,
-            steps=diffusion.sampling_steps,
+            max_passes=diffusion.sampling_steps,
             strategy=diffusion.strategy,
             temperature=diffusion.temperature,
             schedule=make_schedule(diffusion.schedule, diffusion.schedule_power),
@@ -117,68 +121,61 @@ def main(argv: list[str] | None = None) -> None:
         measured_calls.append(calls)
         measured_stopping_reasons.append(stopping_reason)
         elapsed.append(time.perf_counter() - start)
-    autoregressive_result: dict[str, object]
-    if args.autoregressive_checkpoint is None:
-        autoregressive_result = {
-            "status": "pending",
-            "reason": "No gpt2-nano checkpoint was supplied.",
-        }
-    else:
-        if args.batch_size != 1:
-            parser.error(
-                "the staged gpt2-nano generator supports batch size 1 for comparison"
-            )
-        autoregressive = load_autoregressive_model(
-            args.autoregressive_checkpoint,
-            device,
+    if args.batch_size != 1:
+        parser.error(
+            "the gpt2-nano comparison path requires batch size one"
         )
-        if autoregressive.config.vocab_size + 2 != model_config.vocab_size:
-            raise ValueError(
-                "diffusion and autoregressive checkpoints do not share the "
-                "gpt2-nano vocabulary"
-            )
-        if length + 1 > autoregressive.config.context_len:
-            raise ValueError("autoregressive checkpoint context is too short")
-        try:
-            from src.model import generate as generate_autoregressive
-        except ImportError as error:
-            raise RuntimeError("gpt2-nano generation code is unavailable") from error
-        for _ in range(args.warmup):
-            generate_autoregressive(
-                autoregressive,
-                [0],
-                length,
-                use_cache=True,
-                temperature=1.0,
-                do_sample=False,
-            )
-        autoregressive_elapsed = []
-        for _ in range(args.repeats):
-            synchronize(device)
-            start = time.perf_counter()
-            generate_autoregressive(
-                autoregressive,
-                [0],
-                length,
-                use_cache=True,
-                temperature=1.0,
-                do_sample=False,
-            )
-            synchronize(device)
-            autoregressive_elapsed.append(time.perf_counter() - start)
-        autoregressive_result = {
-            "status": "measured",
-            "checkpoint": str(args.autoregressive_checkpoint),
-            "median_seconds": statistics.median(autoregressive_elapsed),
-            "repeats": args.repeats,
-            "batch_size": 1,
-            "generated_tokens_per_sample": length,
-            "network_forward_passes": length,
-            "parameter_count": sum(
-                parameter.numel() for parameter in autoregressive.parameters()
-            ),
-            "decoding": "greedy with KV cache from a one-token prompt",
-        }
+    autoregressive = load_autoregressive_model(
+        args.autoregressive_checkpoint,
+        device,
+    )
+    if autoregressive.config.vocab_size + 2 != model_config.vocab_size:
+        raise ValueError(
+            "diffusion and autoregressive checkpoints do not share the "
+            "gpt2-nano vocabulary"
+        )
+    if length + 1 > autoregressive.config.context_len:
+        raise ValueError("autoregressive checkpoint context is too short")
+    try:
+        from src.model import generate as generate_autoregressive
+    except ImportError as error:
+        raise RuntimeError("gpt2-nano generation code is unavailable") from error
+    for _ in range(args.warmup):
+        generate_autoregressive(
+            autoregressive,
+            [0],
+            length,
+            use_cache=True,
+            temperature=1.0,
+            do_sample=False,
+        )
+    autoregressive_elapsed = []
+    for _ in range(args.repeats):
+        synchronize(device)
+        start = time.perf_counter()
+        generate_autoregressive(
+            autoregressive,
+            [0],
+            length,
+            use_cache=True,
+            temperature=1.0,
+            do_sample=False,
+        )
+        synchronize(device)
+        autoregressive_elapsed.append(time.perf_counter() - start)
+    autoregressive_result = {
+        "status": "measured",
+        "checkpoint": str(args.autoregressive_checkpoint),
+        "median_seconds": statistics.median(autoregressive_elapsed),
+        "repeats": args.repeats,
+        "batch_size": 1,
+        "generated_tokens_per_sample": length,
+        "network_forward_passes": length,
+        "parameter_count": sum(
+            parameter.numel() for parameter in autoregressive.parameters()
+        ),
+        "decoding": "greedy with KV cache from a one-token prompt",
+    }
     result = {
         "status": "measured",
         "environment": {
@@ -207,7 +204,7 @@ def main(argv: list[str] | None = None) -> None:
         "autoregressive_gpt2_nano": autoregressive_result,
         "comparison_protocol": {
             "hardware": "same machine and precision",
-            "tokenizer": "same existing gpt2-nano tokenizer through the local adapter",
+            "tokenizer": "same existing gpt2-nano vocabulary",
             "workload": (
                 "same generated token count and batch size; diffusion is "
                 "unconditional while gpt2-nano starts from one token"

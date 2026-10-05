@@ -24,10 +24,10 @@ from .artifacts import record_artifact, sha256
 from .config import AdaptiveDecodeConfig, DiffusionConfig, ModelConfig, ProjectConfig
 from .corruption import corrupt_tokens
 from .model import MaskedDiffusionTransformer
-from .sampler import sample_from_tokens_with_metadata
+from .runtime import select_device
+from .sampler import sample
 from .schedules import MaskSchedule, make_schedule
-from .tokenizer_data import BinaryTokenDataset, JsonlTokenDataset
-from .train import select_device
+from .tokenizer_data import BinaryTokenDataset
 
 StudyPolicy = Literal["fixed_order", "fixed_fraction", "confidence", "adaptive"]
 Precision = Literal["float32", "float16", "bfloat16"]
@@ -443,6 +443,7 @@ def calibrate_adaptive_policy(
         "candidate_count": len(candidate_results),
         "candidates": candidate_results,
         "selected_config": asdict(selected_config),
+        "selected_early_stopping_enabled": selected_config.early_stopping_enabled,
         "selected_metrics": selected_metrics,
     }
 
@@ -753,7 +754,7 @@ def run_study(
     }
     return {
         "status": "measured",
-        "study": "confidence-calibrated adaptive reveal scheduling",
+        "study": "calibrated adaptive stopping",
         "environment": {
             "platform": platform.platform(),
             "python": platform.python_version(),
@@ -772,6 +773,10 @@ def run_study(
             "immutable_input_expectations": immutable_expectations,
         },
         "protocol": {
+            "environment_scope": (
+                "post-training evaluation; checkpoint provenance does not record "
+                "the training environment"
+            ),
             "seed": config.seed,
             "initial_timestep": config.initial_timestep,
             "declared_max_passes": config.max_passes,
@@ -824,7 +829,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--config",
         type=Path,
-        default=Path("configs/adaptive_study_smoke.toml"),
+        default=Path("configs/adaptive_study_publication.toml"),
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="write a reproduction without replacing the recorded result",
     )
     args = parser.parse_args(argv)
     try:
@@ -833,12 +843,13 @@ def main(argv: list[str] | None = None) -> None:
     except ValueError as error:
         parser.error(str(error))
     payload = json.dumps(result, indent=2, sort_keys=True) + "\n"
-    config.output_path.parent.mkdir(parents=True, exist_ok=True)
-    config.output_path.write_text(payload, encoding="utf-8")
-    if config.manifest_path is not None:
+    output_path = args.output or config.output_path
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(payload, encoding="utf-8")
+    if config.manifest_path is not None and args.output is None:
         record_artifact(
             config.manifest_path,
-            config.output_path,
+            output_path,
             kind="adaptive-decoding-study",
             status="measured",
             provenance={
@@ -882,13 +893,13 @@ def _evaluate_example(
     _synchronize(device)
     start = time.perf_counter()
     with _autocast_context(device, precision):
-        result = sample_from_tokens_with_metadata(
+        result = sample(
             model,
-            example.corrupted,
+            initial_tokens=example.corrupted,
             mask_token_id=model_config.mask_token_id,
             pad_token_id=model_config.pad_token_id,
             vocab_size=model_config.vocab_size,
-            steps=max_passes,
+            max_passes=max_passes,
             strategy=policy,
             temperature=diffusion_config.temperature,
             schedule=schedule,
@@ -998,16 +1009,14 @@ def _load_token_dataset(
     corpus_path: Path,
     sequence_length: int,
     token_limit: int,
-) -> BinaryTokenDataset | JsonlTokenDataset:
-    if corpus_path.suffix == ".jsonl":
-        return JsonlTokenDataset(corpus_path, sequence_length)
-    if corpus_path.suffix == ".bin":
-        return BinaryTokenDataset(
-            corpus_path,
-            sequence_length,
-            token_limit=token_limit,
-        )
-    raise ValueError("study corpus must be a .bin or .jsonl token dataset")
+) -> BinaryTokenDataset:
+    if corpus_path.suffix != ".bin":
+        raise ValueError("study corpus must be a headered .bin token shard")
+    return BinaryTokenDataset(
+        corpus_path,
+        sequence_length,
+        token_limit=token_limit,
+    )
 
 
 def _make_generator(device: torch.device, seed: int) -> torch.Generator | None:

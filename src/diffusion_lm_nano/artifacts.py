@@ -45,8 +45,8 @@ def record_artifact(
     status: str,
     provenance: dict[str, Any],
 ) -> None:
-    if status not in {"measured", "simulated", "pending"}:
-        raise ValueError("artifact status must be measured, simulated, or pending")
+    if status != "measured":
+        raise ValueError("release artifacts must have measured status")
     manifest_file = Path(manifest_path)
     root = manifest_file.parent.parent
     artifact_file = Path(artifact_path)

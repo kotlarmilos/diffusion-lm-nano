@@ -13,24 +13,18 @@ from .config import DiffusionConfig, ModelConfig
 from .corruption import corrupt_tokens
 from .model import MaskedDiffusionTransformer
 from .objective import masked_accuracy, masked_cross_entropy
+from .runtime import select_device
 from .schedules import make_schedule
-from .tokenizer_data import (
-    BinaryTokenDataset,
-    ByteTokenizer,
-    GPT2NanoTokenizerAdapter,
-)
-from .train import select_device
+from .tokenizer_data import BinaryTokenDataset
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--text", default="parallel token updates")
+    parser.add_argument("--corpus-path", type=Path, required=True)
     parser.add_argument("--timestep", type=float, default=0.5)
     parser.add_argument("--seed", type=int, default=11)
-    parser.add_argument("--tokenizer-path", type=Path)
     parser.add_argument("--device", default="auto")
-    parser.add_argument("--corpus-path", type=Path)
     parser.add_argument("--batch-size", type=int, default=16)
     parser.add_argument("--max-sequences", type=int, default=256)
     parser.add_argument("--validation-fraction", type=float)
@@ -49,63 +43,34 @@ def main(argv: list[str] | None = None) -> None:
     model = MaskedDiffusionTransformer(model_config).to(device)
     model.load_state_dict(checkpoint["model_state"])
     model.eval()
-    tokenizer_info = checkpoint.get("tokenizer")
-    tokenizer_kind = None if tokenizer_info is None else tokenizer_info.get("kind")
-    tokenizer_path = args.tokenizer_path
-    if tokenizer_kind == "GPT2NanoTokenizerAdapter":
-        if tokenizer_path is None and tokenizer_info.get("path"):
-            tokenizer_path = Path(str(tokenizer_info["path"]))
-        if tokenizer_path is None:
-            raise ValueError("checkpoint requires --tokenizer-path for GPT2 token ids")
-        tokenizer = GPT2NanoTokenizerAdapter(tokenizer_path)
-    elif tokenizer_kind in {None, "ByteTokenizer"}:
-        tokenizer = ByteTokenizer()
-    else:
-        raise ValueError(f"unknown tokenizer kind in checkpoint: {tokenizer_kind!r}")
-    if (
-        tokenizer.vocab_size != model_config.vocab_size
-        or tokenizer.pad_token_id != model_config.pad_token_id
-        or tokenizer.mask_token_id != model_config.mask_token_id
-    ):
-        raise ValueError("checkpoint and tokenizer vocabulary settings do not match")
-    batches: list[torch.Tensor] = []
-    evaluation_source: str
-    if args.corpus_path is None:
-        ids = tokenizer.encode(args.text)[: model_config.max_length]
-        ids += [model_config.pad_token_id] * (model_config.max_length - len(ids))
-        batches.append(torch.tensor([ids], device=device))
-        evaluation_source = "command-line text"
-    else:
-        dataset = BinaryTokenDataset(
-            args.corpus_path,
-            model_config.max_length,
-            token_limit=model_config.pad_token_id,
+    dataset = BinaryTokenDataset(
+        args.corpus_path,
+        model_config.max_length,
+        token_limit=model_config.pad_token_id,
+    )
+    train_config = checkpoint.get("train_config", {})
+    validation_fraction = (
+        float(args.validation_fraction)
+        if args.validation_fraction is not None
+        else float(train_config.get("validation_fraction", 0.1))
+    )
+    if not 0.0 < validation_fraction < 1.0:
+        parser.error("--validation-fraction must be in (0, 1)")
+    validation_start = int(len(dataset) * (1.0 - validation_fraction))
+    selected = [
+        dataset[index]
+        for index in range(
+            validation_start,
+            min(len(dataset), validation_start + args.max_sequences),
         )
-        train_config = checkpoint.get("train_config", {})
-        validation_fraction = (
-            float(args.validation_fraction)
-            if args.validation_fraction is not None
-            else float(train_config.get("validation_fraction", 0.1))
-        )
-        if not 0.0 < validation_fraction < 1.0:
-            parser.error("--validation-fraction must be in (0, 1)")
-        validation_start = int(len(dataset) * (1.0 - validation_fraction))
-        selected = [
-            dataset[index]
-            for index in range(
-                validation_start,
-                min(len(dataset), validation_start + args.max_sequences),
-            )
-        ]
-        if not selected:
-            raise ValueError("corpus contains no held-out validation sequences")
-        batches.extend(
-            torch.stack(selected[offset : offset + args.batch_size]).to(device)
-            for offset in range(0, len(selected), args.batch_size)
-        )
-        evaluation_source = (
-            f"contiguous tail holdout from {args.corpus_path}"
-        )
+    ]
+    if not selected:
+        raise ValueError("corpus contains no held-out validation sequences")
+    batches = [
+        torch.stack(selected[offset : offset + args.batch_size]).to(device)
+        for offset in range(0, len(selected), args.batch_size)
+    ]
+    evaluation_source = f"contiguous tail holdout from {args.corpus_path}"
     generator = (
         None
         if device.type == "mps"

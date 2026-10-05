@@ -48,92 +48,14 @@ class SamplingResult:
 def sample(
     model: nn.Module,
     *,
-    batch_size: int,
-    length: int,
+    initial_tokens: Tensor | None = None,
+    batch_size: int | None = None,
+    length: int | None = None,
     mask_token_id: int,
     pad_token_id: int,
     vocab_size: int,
-    steps: int,
-    strategy: DecodeStrategy = "confidence",
-    temperature: float = 1.0,
-    schedule: MaskSchedule | None = None,
-    device: torch.device | str = "cpu",
-    generator: torch.Generator | None = None,
-    callback: StepCallback | None = None,
-    adaptive_config: AdaptiveDecodeConfig | None = None,
-) -> Tensor:
-    """Generate fixed-length sequences by progressively revealing masked positions."""
-    return sample_with_metadata(
-        model,
-        batch_size=batch_size,
-        length=length,
-        mask_token_id=mask_token_id,
-        pad_token_id=pad_token_id,
-        vocab_size=vocab_size,
-        steps=steps,
-        strategy=strategy,
-        temperature=temperature,
-        schedule=schedule,
-        device=device,
-        generator=generator,
-        callback=callback,
-        adaptive_config=adaptive_config,
-        collect_diagnostics=False,
-    ).tokens
-
-
-@torch.no_grad()
-def sample_with_metadata(
-    model: nn.Module,
-    *,
-    batch_size: int,
-    length: int,
-    mask_token_id: int,
-    pad_token_id: int,
-    vocab_size: int,
-    steps: int,
-    strategy: DecodeStrategy = "confidence",
-    temperature: float = 1.0,
-    schedule: MaskSchedule | None = None,
-    device: torch.device | str = "cpu",
-    generator: torch.Generator | None = None,
-    callback: StepCallback | None = None,
-    adaptive_config: AdaptiveDecodeConfig | None = None,
-    collect_diagnostics: bool = True,
-) -> SamplingResult:
-    """Generate a sequence and return pass accounting and audit trajectory."""
-    if batch_size < 1 or length < 1 or steps < 1:
-        raise ValueError("batch_size, length, and steps must be positive")
-    initial_tokens = torch.full(
-        (batch_size, length), mask_token_id, dtype=torch.long, device=device
-    )
-    return sample_from_tokens_with_metadata(
-        model,
-        initial_tokens,
-        mask_token_id=mask_token_id,
-        pad_token_id=pad_token_id,
-        vocab_size=vocab_size,
-        steps=steps,
-        strategy=strategy,
-        temperature=temperature,
-        schedule=schedule,
-        device=device,
-        generator=generator,
-        callback=callback,
-        adaptive_config=adaptive_config,
-        collect_diagnostics=collect_diagnostics,
-    )
-
-
-@torch.no_grad()
-def sample_from_tokens(
-    model: nn.Module,
-    initial_tokens: Tensor,
-    *,
-    mask_token_id: int,
-    pad_token_id: int,
-    vocab_size: int,
-    steps: int,
+    max_passes: int | None = None,
+    steps: int | None = None,
     strategy: DecodeStrategy = "confidence",
     temperature: float = 1.0,
     schedule: MaskSchedule | None = None,
@@ -142,49 +64,34 @@ def sample_from_tokens(
     callback: StepCallback | None = None,
     start_timestep: float = 1.0,
     adaptive_config: AdaptiveDecodeConfig | None = None,
-) -> Tensor:
-    """Reveal mask tokens in an existing sequence with the sampler reveal loop."""
-    return sample_from_tokens_with_metadata(
-        model,
-        initial_tokens,
-        mask_token_id=mask_token_id,
-        pad_token_id=pad_token_id,
-        vocab_size=vocab_size,
-        steps=steps,
-        strategy=strategy,
-        temperature=temperature,
-        schedule=schedule,
-        device=device,
-        generator=generator,
-        callback=callback,
-        start_timestep=start_timestep,
-        adaptive_config=adaptive_config,
-        collect_diagnostics=False,
-    ).tokens
-
-
-@torch.no_grad()
-def sample_from_tokens_with_metadata(
-    model: nn.Module,
-    initial_tokens: Tensor,
-    *,
-    mask_token_id: int,
-    pad_token_id: int,
-    vocab_size: int,
-    steps: int,
-    strategy: DecodeStrategy = "confidence",
-    temperature: float = 1.0,
-    schedule: MaskSchedule | None = None,
-    device: torch.device | str = "cpu",
-    generator: torch.Generator | None = None,
-    callback: StepCallback | None = None,
-    start_timestep: float = 1.0,
-    adaptive_config: AdaptiveDecodeConfig | None = None,
-    collect_diagnostics: bool = True,
+    collect_diagnostics: bool = False,
 ) -> SamplingResult:
-    """Reveal masks and return the complete sequence with adaptive diagnostics."""
-    if initial_tokens.ndim != 2 or steps < 1:
-        raise ValueError("initial_tokens must be rank two and steps must be positive")
+    """Reveal all masks and return pass accounting and optional diagnostics."""
+    if max_passes is None:
+        max_passes = steps
+    elif steps is not None:
+        raise ValueError("set max_passes or steps, not both")
+    if max_passes is None:
+        raise ValueError("max_passes is required")
+    if max_passes < 1:
+        raise ValueError("max_passes must be positive")
+    if initial_tokens is None:
+        if batch_size is None or length is None or batch_size < 1 or length < 1:
+            raise ValueError("batch_size and length must be positive")
+        tokens = torch.full(
+            (batch_size, length),
+            mask_token_id,
+            dtype=torch.long,
+            device=device,
+        )
+    else:
+        if batch_size is not None or length is not None:
+            raise ValueError(
+                "batch_size and length cannot be set with initial_tokens"
+            )
+        if initial_tokens.ndim != 2:
+            raise ValueError("initial_tokens must be rank two")
+        tokens = initial_tokens.to(device=device, dtype=torch.long).clone()
     if strategy not in {"fixed_fraction", "confidence", "fixed_order", "adaptive"}:
         raise ValueError(f"unknown strategy {strategy!r}")
     if temperature < 0:
@@ -197,11 +104,9 @@ def sample_from_tokens_with_metadata(
         raise ValueError("special token ids must be within the vocabulary")
     if mask_token_id == pad_token_id:
         raise ValueError("mask and pad token ids must differ")
-
     resolved_adaptive_config = adaptive_config or AdaptiveDecodeConfig()
     if strategy == "adaptive":
-        resolved_adaptive_config.validate(steps)
-    tokens = initial_tokens.to(device=device, dtype=torch.long).clone()
+        resolved_adaptive_config.validate(max_passes)
     batch_size, length = tokens.shape
     trajectory: list[SamplingStep] = []
     previous_mean_confidence: float | None = None
@@ -216,13 +121,13 @@ def sample_from_tokens_with_metadata(
             trajectory=(),
         )
 
-    for step in range(steps):
+    for step in range(max_passes):
         masked = tokens.eq(mask_token_id)
         unresolved_count = int(masked.sum().item())
         if not unresolved_count:
             stopping_reason = "all_revealed"
             break
-        time_value = start_timestep * (1.0 - step / steps)
+        time_value = start_timestep * (1.0 - step / max_passes)
         t = torch.full((batch_size,), time_value, device=tokens.device)
         logits = model(tokens, t)
         if logits.shape != (batch_size, length, vocab_size):
@@ -252,15 +157,16 @@ def sample_from_tokens_with_metadata(
         if (
             strategy == "adaptive"
             and pass_index >= resolved_adaptive_config.min_passes
-            and pass_index < steps
+            and pass_index < max_passes
         ):
             if (
-                mean_entropy is not None
+                resolved_adaptive_config.entropy_rule_enabled
+                and mean_entropy is not None
                 and mean_entropy < resolved_adaptive_config.entropy_threshold
             ):
                 adaptive_reason = "entropy_threshold"
             if (
-                resolved_adaptive_config.confidence_patience
+                resolved_adaptive_config.confidence_rule_enabled
                 and confidence_improvement is not None
             ):
                 if (
@@ -284,7 +190,7 @@ def sample_from_tokens_with_metadata(
             target_mask_fraction = (
                 schedule.probability(t) if schedule is not None else t.clamp(0.0, 1.0)
             )
-            steps_left = steps - step
+            passes_left = max_passes - step
             for batch_index in range(batch_size):
                 positions = masked[batch_index].nonzero(as_tuple=False).flatten()
                 if positions.numel() == 0:
@@ -293,7 +199,7 @@ def sample_from_tokens_with_metadata(
                     math.ceil(float(target_mask_fraction[batch_index].item() * length))
                 )
                 schedule_count = positions.numel() - target_remaining
-                termination_count = math.ceil(positions.numel() / steps_left)
+                termination_count = math.ceil(positions.numel() / passes_left)
                 count = max(schedule_count, termination_count)
                 count = min(count, positions.numel())
                 if count == positions.numel():
@@ -319,7 +225,9 @@ def sample_from_tokens_with_metadata(
         step_stopping_reason: StoppingReason | None = adaptive_reason
         if not remaining_count and step_stopping_reason is None:
             step_stopping_reason = (
-                "maximum_passes" if pass_index == steps else "all_revealed"
+                "maximum_passes"
+                if pass_index == max_passes
+                else "all_revealed"
             )
         trajectory.append(
             SamplingStep(

@@ -1,3 +1,5 @@
+"""Measure majority-token collapse against the publication checkpoint holdout."""
+
 from __future__ import annotations
 
 import argparse
@@ -12,7 +14,7 @@ from diffusion_lm_nano.config import ProjectConfig
 from diffusion_lm_nano.tokenizer_data import BinaryTokenDataset
 
 
-def analyze(
+def analyze_majority_control(
     config_path: Path,
     checkpoint_path: Path,
     corpus_path: Path,
@@ -24,12 +26,26 @@ def analyze(
     checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
     model_config = checkpoint["model_config"]
     train_config = checkpoint["train_config"]
+    source = checkpoint.get("source")
+    training_inputs = checkpoint.get("training_inputs")
     if (
         model_config["max_length"] != config.model.max_length
         or model_config["pad_token_id"] != config.model.pad_token_id
         or train_config["validation_fraction"] != config.train.validation_fraction
     ):
         raise ValueError("checkpoint holdout settings do not match the configuration")
+    if (
+        not isinstance(source, dict)
+        or source.get("git_dirty") is not False
+        or source.get("git_state_captured") != "training_start"
+    ):
+        raise ValueError("checkpoint does not record clean training source provenance")
+    if not isinstance(training_inputs, dict):
+        raise ValueError("checkpoint does not record immutable training inputs")
+    if training_inputs.get("training_config_sha256") != sha256(config_path):
+        raise ValueError("configuration hash does not match the checkpoint")
+    if training_inputs.get("corpus_sha256") != sha256(corpus_path):
+        raise ValueError("corpus hash does not match the checkpoint")
     dataset = BinaryTokenDataset(
         corpus_path,
         model_config["max_length"],
@@ -56,6 +72,11 @@ def analyze(
     evaluation = json.loads(evaluation_path.read_text(encoding="utf-8"))
     sample = json.loads(sample_path.read_text(encoding="utf-8"))
     sample_ids = sample["token_ids"]
+    evaluated_sequences = end - validation_start
+    if evaluation.get("evaluated_sequences") != evaluated_sequences:
+        raise ValueError("evaluation count does not match the checkpoint holdout")
+    if len(sample_ids) != model_config["max_length"]:
+        raise ValueError("sample length does not match the checkpoint geometry")
     return {
         "status": "measured",
         "method": "constant-token control over the complete evaluated holdout sequences",
@@ -88,7 +109,7 @@ def analyze(
         "holdout": {
             "start_dataset_index": validation_start,
             "end_dataset_index_exclusive": end,
-            "sequences": end - validation_start,
+            "sequences": evaluated_sequences,
             "tokens": len(tokens),
             "majority_token_id": majority_token_id,
             "majority_token_piece": majority_token_piece,
@@ -117,6 +138,7 @@ def analyze(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
+    recorded_output = Path("artifacts/publication-majority-control.json")
     parser.add_argument("--config", type=Path, default=Path("configs/publication.toml"))
     parser.add_argument(
         "--checkpoint",
@@ -142,7 +164,7 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("artifacts/publication-majority-control.json"),
+        default=recorded_output,
     )
     parser.add_argument(
         "--manifest",
@@ -150,7 +172,7 @@ def main() -> None:
         default=Path("artifacts/manifest.json"),
     )
     args = parser.parse_args()
-    result = analyze(
+    result = analyze_majority_control(
         args.config,
         args.checkpoint,
         args.corpus,
@@ -163,19 +185,20 @@ def main() -> None:
         json.dumps(result, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-    record_artifact(
-        args.manifest,
-        args.output,
-        kind="majority-token-control",
-        status="measured",
-        provenance={
-            "command": "python scripts/analyze_publication_baseline.py",
-            "checkpoint": str(args.checkpoint),
-            "corpus": str(args.corpus),
-            "evaluation": str(args.evaluation),
-            "sample": str(args.sample),
-        },
-    )
+    if args.output == recorded_output:
+        record_artifact(
+            args.manifest,
+            args.output,
+            kind="majority-token-control",
+            status="measured",
+            provenance={
+                "command": "python scripts/analyze_publication_baseline.py",
+                "checkpoint": str(args.checkpoint),
+                "corpus": str(args.corpus),
+                "evaluation": str(args.evaluation),
+                "sample": str(args.sample),
+            },
+        )
     print(args.output)
 
 

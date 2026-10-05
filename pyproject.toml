@@ -8,18 +8,13 @@ version = "0.1.0rc1"
 description = "A small discrete masked diffusion language model for an engineering article"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
 authors = [{ name = "Milos Kotlar" }]
 dependencies = ["torch>=2.2"]
 
-[project.optional-dependencies]
-space = ["gradio>=4.44"]
-
 [project.scripts]
-diffusion-lm-train = "diffusion_lm_nano.train:main"
 diffusion-lm-evaluate = "diffusion_lm_nano.evaluate:main"
+diffusion-lm-adaptive-study = "diffusion_lm_nano.adaptive_study:main"
 diffusion-lm-benchmark = "diffusion_lm_nano.benchmark:main"
-diffusion-lm-decoding = "diffusion_lm_nano.decoding_study:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/diffusion_lm_nano"]

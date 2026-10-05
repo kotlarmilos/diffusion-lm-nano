@@ -52,6 +52,18 @@ class AdaptiveDecodeConfig:
     confidence_delta: float = 0.0
     confidence_patience: int = 0
 
+    @property
+    def entropy_rule_enabled(self) -> bool:
+        return self.entropy_threshold > 0.0
+
+    @property
+    def confidence_rule_enabled(self) -> bool:
+        return self.confidence_patience > 0
+
+    @property
+    def early_stopping_enabled(self) -> bool:
+        return self.entropy_rule_enabled or self.confidence_rule_enabled
+
     def validate(self, max_passes: int | None = None) -> None:
         if isinstance(self.min_passes, bool) or not isinstance(self.min_passes, int):
             raise ValueError("adaptive min_passes must be an integer")
@@ -83,13 +95,13 @@ class AdaptiveDecodeConfig:
             return
         if self.min_passes > max_passes:
             raise ValueError("adaptive min_passes cannot exceed sampling_steps")
-        if self.entropy_threshold > 0 and self.min_passes >= max_passes:
+        if self.entropy_rule_enabled and self.min_passes >= max_passes:
             raise ValueError(
                 "adaptive entropy_threshold cannot trigger before sampling_steps"
             )
         available_improvements = max_passes - max(2, self.min_passes)
         if (
-            self.confidence_patience
+            self.confidence_rule_enabled
             and self.confidence_patience > available_improvements
         ):
             raise ValueError(
